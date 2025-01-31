@@ -37,8 +37,11 @@ def build_sidebar():
         prices = prices.to_frame()
         prices.columns = [tickers[0]]  # Define o nome da coluna como o ticker selecionado
 
-    # Remove o sufixo ".SA" dos nomes das colunas
-    prices.columns = [col.rstrip(".SA") for col in prices.columns]
+    # Remove o sufixo ".SA" dos nomes das colunas (se houver)
+    if isinstance(prices.columns, pd.Index):
+        prices.columns = [col.rstrip(".SA") if isinstance(col, str) else col for col in prices.columns]
+    else:
+        prices.columns = [str(col).rstrip(".SA") for col in prices.columns]
 
     # Adiciona o IBOV ao DataFrame
     ibov_data = yf.download("^BVSP", start=start_date, end=end_date)["Adj Close"]
