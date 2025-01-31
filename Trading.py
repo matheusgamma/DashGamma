@@ -12,8 +12,8 @@ import yahooquery as yq
 from bs4 import BeautifulSoup
 
 def build_sidebar():
-    st.image(r"C:\Users\mathe\PycharmProjects\TradeFinance\images\Gamma-XP.png")
-    ticker_list = pd.read_csv(r"C:\Users\mathe\PycharmProjects\TradeFinance\tickers\tickers_ibra.csv", index_col=0)
+    st.image("images/Gamma-XP.png")
+    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
     tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
     tickers = [t + ".SA" for t in tickers]
     start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
