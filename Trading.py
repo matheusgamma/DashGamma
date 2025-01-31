@@ -12,8 +12,10 @@ import yahooquery as yq
 from bs4 import BeautifulSoup
 
 def build_sidebar():
-    st.image("images/Gamma-XP.png")
-    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
+    # Carrega a imagem do repositório (caminho relativo)
+    st.image("images/Gamma-XP.png")  # Certifique-se de que a imagem está na pasta "images" do repositório
+
+    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  # Caminho relativo para o CSV
     tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
     tickers = [t + ".SA" for t in tickers]
     start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
@@ -29,14 +31,15 @@ def build_sidebar():
         st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
         return None, None
 
-    prices = prices["Adj Close"] if "Adj Close" in prices else prices
-
-    # Ajustar caso apenas um ticker seja selecionado
+    # Garante que prices seja um DataFrame, mesmo com um único ticker
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
         prices.columns = [tickers[0].rstrip(".SA")]
 
+    # Remove o sufixo ".SA" dos nomes das colunas
     prices.columns = prices.columns.str.rstrip(".SA")
+
+    # Adiciona o IBOV ao DataFrame
     prices['IBOV'] = yf.download("^BVSP", start=start_date, end=end_date)["Adj Close"]
     return tickers, prices
 
