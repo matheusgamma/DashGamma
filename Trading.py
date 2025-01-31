@@ -25,22 +25,25 @@ def build_sidebar():
         st.warning("Por favor, selecione pelo menos um ticker.")
         return None, None
 
+    # Baixa os preços dos tickers selecionados
     prices = yf.download(tickers, start=start_date, end=end_date)
 
     if prices.empty:
         st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
         return None, None
 
-    # Garante que prices seja um DataFrame, mesmo com um único ticker
+    # Garante que prices seja um DataFrame
     if isinstance(prices, pd.Series):
         prices = prices.to_frame()
-        prices.columns = [tickers[0].rstrip(".SA")]
+        prices.columns = [tickers[0]]  # Define o nome da coluna como o ticker selecionado
 
     # Remove o sufixo ".SA" dos nomes das colunas
-    prices.columns = prices.columns.str.rstrip(".SA")
+    prices.columns = [col.rstrip(".SA") for col in prices.columns]
 
     # Adiciona o IBOV ao DataFrame
-    prices['IBOV'] = yf.download("^BVSP", start=start_date, end=end_date)["Adj Close"]
+    ibov_data = yf.download("^BVSP", start=start_date, end=end_date)["Adj Close"]
+    prices['IBOV'] = ibov_data
+
     return tickers, prices
 
 def calculate_beta(returns, market_returns):
