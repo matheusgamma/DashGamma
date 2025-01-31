@@ -1,12 +1,11 @@
-streamlit as st
-pandas as pd
-numpy as np
-yfinance as yf
-plotly.express as px
+streamlit
+pandas
+numpy
+yfinance
+plotly
 datetime
-style_metric_cards
-streamlit_extras.grid
+streamlit-extras
 seaborn
-matplotlib.pyplot
+matplotlib
 yahooquery
-BeautifulSoup
+bs4
