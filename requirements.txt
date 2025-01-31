@@ -1,0 +1,14 @@
+streamlit
+pandas
+numpy as np
+yfinance as yf
+plotly.express as px
+datetime
+style_metric_cards
+streamlit_extras.grid
+grid
+seaborn
+matplotlib.pyplot
+yahooquery
+BeautifulSoup
+bs4
