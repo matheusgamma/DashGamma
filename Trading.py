@@ -25,29 +25,34 @@ def build_sidebar():
         st.warning("Por favor, selecione pelo menos um ticker.")
         return None, None
 
-    # Baixa os preços dos tickers selecionados
-    prices = yf.download(tickers, start=start_date, end=end_date)
+    try:
+        # Baixa os preços dos tickers selecionados
+        prices = yf.download(tickers, start=start_date, end=end_date)
 
-    if prices.empty:
-        st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
+        if prices.empty:
+            st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
+            return None, None
+
+        # Garante que prices seja um DataFrame
+        if isinstance(prices, pd.Series):
+            prices = prices.to_frame()
+            prices.columns = [tickers[0]]  # Define o nome da coluna como o ticker selecionado
+
+        # Remove o sufixo ".SA" dos nomes das colunas (se houver)
+        if isinstance(prices.columns, pd.Index):
+            prices.columns = [col.rstrip(".SA") if isinstance(col, str) else str(col) for col in prices.columns]
+        else:
+            prices.columns = [str(col).rstrip(".SA") for col in prices.columns]
+
+        # Adiciona o IBOV ao DataFrame
+        ibov_data = yf.download("^BVSP", start=start_date, end=end_date)["Adj Close"]
+        prices['IBOV'] = ibov_data
+
+        return tickers, prices
+
+    except Exception as e:
+        st.error(f"Ocorreu um erro ao processar os dados: {e}")
         return None, None
-
-    # Garante que prices seja um DataFrame
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame()
-        prices.columns = [tickers[0]]  # Define o nome da coluna como o ticker selecionado
-
-    # Remove o sufixo ".SA" dos nomes das colunas (se houver)
-    if isinstance(prices.columns, pd.Index):
-        prices.columns = [col.rstrip(".SA") if isinstance(col, str) else col for col in prices.columns]
-    else:
-        prices.columns = [str(col).rstrip(".SA") for col in prices.columns]
-
-    # Adiciona o IBOV ao DataFrame
-    ibov_data = yf.download("^BVSP", start=start_date, end=end_date)["Adj Close"]
-    prices['IBOV'] = ibov_data
-
-    return tickers, prices
 
 def calculate_beta(returns, market_returns):
     covariance = np.cov(returns, market_returns)[0][1]
