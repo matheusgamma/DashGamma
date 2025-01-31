@@ -82,10 +82,10 @@ def main_dashboard(tickers, prices):
 
         colA, colB, colC, colD = c.columns([4, 6, 6, 6])
         if t == "portfolio":
-            colA.image(r"C:\Users\mathe\PycharmProjects\TradeFinance\images\pie-chart-dollar-svgrepo-com.svg",
+            colA.image("images\pie-chart-dollar-svgrepo-com.svg",
                        use_container_width=True)
         elif t == "IBOV":
-            colA.image(r"C:\Users\mathe\PycharmProjects\TradeFinance\images\pie-chart-svgrepo-com.svg",
+            colA.image("images\pie-chart-svgrepo-com.svg",
                        use_container_width=True)
         else:
             colA.image(f'https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/{t}.png', width=85,
@@ -344,10 +344,10 @@ def cointegracao(tickers, prices):
 
         colA, colB, colC, colD = c.columns([4, 6, 6, 6])
         if t == "portfolio":
-            colA.image(r"C:\Users\mathe\PycharmProjects\TradeFinance\images\pie-chart-dollar-svgrepo-com.svg",
+            colA.image("images\pie-chart-dollar-svgrepo-com.svg",
                        use_container_width=True)
         elif t == "IBOV":
-            colA.image(r"C:\Users\mathe\PycharmProjects\TradeFinance\images\pie-chart-svgrepo-com.svg",
+            colA.image("\images\pie-chart-svgrepo-com.svg",
                        use_container_width=True)
         else:
             colA.image(f'https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/{t}.png', width=85,
