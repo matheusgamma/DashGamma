@@ -45,8 +45,26 @@ def build_sidebar():
             prices.columns = [str(col).rstrip(".SA") for col in prices.columns]
 
         # Adiciona o IBOV ao DataFrame
-        ibov_data = yf.download("^BVSP", start=start_date, end=end_date)["Adj Close"]
-        prices['IBOV'] = ibov_data
+        try:
+            ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
+            if "Adj Close" in ibov_data:
+                prices['IBOV'] = ibov_data["Adj Close"]
+            else:
+                st.warning("Dados do IBOV não contêm 'Adj Close'. Usando 'Close' como alternativa.")
+                prices['IBOV'] = ibov_data["Close"]
+        except Exception as e:
+            st.warning(f"Não foi possível obter dados do IBOV: {e}")
+            prices['IBOV'] = np.nan  # Adiciona uma coluna de NaN se o IBOV não estiver disponível
+
+        # Verifica se a coluna "Adj Close" existe nos dados baixados
+        if "Adj Close" in prices:
+            prices = prices["Adj Close"]  # Usa apenas a coluna "Adj Close"
+        elif "Close" in prices:
+            st.warning("Dados dos tickers não contêm 'Adj Close'. Usando 'Close' como alternativa.")
+            prices = prices["Close"]  # Usa a coluna "Close" como alternativa
+        else:
+            st.error("Nenhuma coluna de preços ('Adj Close' ou 'Close') encontrada nos dados.")
+            return None, None
 
         return tickers, prices
 
