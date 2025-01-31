@@ -69,7 +69,6 @@ def main_dashboard(tickers, prices):
     vols = returns.std() * np.sqrt(252)
     rets = (norm_prices.iloc[-1] - 100) / 100
 
-
     market_returns = returns["IBOV"]
     betas = {
         t: calculate_beta(returns[t], market_returns) for t in prices.columns if t != "IBOV"
@@ -82,20 +81,18 @@ def main_dashboard(tickers, prices):
 
         colA, colB, colC, colD = c.columns([4, 6, 6, 6])
         if t == "portfolio":
-            colA.image("images\pie-chart-dollar-svgrepo-com.svg",
-                       use_container_width=True)
+            colA.image("images/pie-chart-dollar-svgrepo-com.svg", use_container_width=True)
         elif t == "IBOV":
-            colA.image("images\pie-chart-svgrepo-com.svg",
-                       use_container_width=True)
+            colA.image("images/pie-chart-svgrepo-com.svg", use_container_width=True)
         else:
-            colA.image(f'https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/{t}.png', width=85,
-                       use_container_width=True)
+            colA.image(f'https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/{t}.png', width=85, use_container_width=True)
 
         colB.metric(label="Retorno", value=f"{rets[t]:.0%}")
         colC.metric(label="Volatilidade", value=f"{vols[t]:.0%}")
         colD.metric(label="Beta", value=f"{betas[t]:.2f}" if t in betas else "N/A")
 
         style_metric_cards(background_color='rgba(255,255,255,0)')
+
     col1, col2 = st.columns(2, gap='large')
     with col1:
         st.subheader("Desempenho Relativo")
