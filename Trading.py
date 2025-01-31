@@ -15,7 +15,10 @@ def build_sidebar():
     # Carrega a imagem do repositório (caminho relativo)
     st.image("images/Gamma-XP.png")  # Certifique-se de que a imagem está na pasta "images" do repositório
 
-    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  # Caminho relativo para o CSV
+    # Carrega a lista de tickers do repositório (caminho relativo)
+    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  # Certifique-se de que o CSV está na pasta "tickers"
+
+    # Seleciona os tickers
     tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
     tickers = [t + ".SA" for t in tickers]
     start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
@@ -25,52 +28,29 @@ def build_sidebar():
         st.warning("Por favor, selecione pelo menos um ticker.")
         return None, None
 
-    try:
-        # Baixa os preços dos tickers selecionados
-        prices = yf.download(tickers, start=start_date, end=end_date)
+    # Baixa os preços dos tickers selecionados
+    prices = yf.download(tickers, start=start_date, end=end_date)
 
-        if prices.empty:
-            st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
-            return None, None
-
-        # Garante que prices seja um DataFrame
-        if isinstance(prices, pd.Series):
-            prices = prices.to_frame()
-            prices.columns = [tickers[0]]  # Define o nome da coluna como o ticker selecionado
-
-        # Remove o sufixo ".SA" dos nomes das colunas (se houver)
-        if isinstance(prices.columns, pd.Index):
-            prices.columns = [col.rstrip(".SA") if isinstance(col, str) else str(col) for col in prices.columns]
-        else:
-            prices.columns = [str(col).rstrip(".SA") for col in prices.columns]
-
-        # Adiciona o IBOV ao DataFrame
-        try:
-            ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
-            if "Adj Close" in ibov_data:
-                prices['IBOV'] = ibov_data["Adj Close"]
-            else:
-                st.warning("Dados do IBOV não contêm 'Adj Close'. Usando 'Close' como alternativa.")
-                prices['IBOV'] = ibov_data["Close"]
-        except Exception as e:
-            st.warning(f"Não foi possível obter dados do IBOV: {e}")
-            prices['IBOV'] = np.nan  # Adiciona uma coluna de NaN se o IBOV não estiver disponível
-
-        # Verifica se a coluna "Adj Close" existe nos dados baixados
-        if "Adj Close" in prices:
-            prices = prices["Adj Close"]  # Usa apenas a coluna "Adj Close"
-        elif "Close" in prices:
-            st.warning("Dados dos tickers não contêm 'Adj Close'. Usando 'Close' como alternativa.")
-            prices = prices["Close"]  # Usa a coluna "Close" como alternativa
-        else:
-            st.error("Nenhuma coluna de preços ('Adj Close' ou 'Close') encontrada nos dados.")
-            return None, None
-
-        return tickers, prices
-
-    except Exception as e:
-        st.error(f"Ocorreu um erro ao processar os dados: {e}")
+    if prices.empty:
+        st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
         return None, None
+
+    # Usa "Adj Close" se disponível, caso contrário, usa "Close"
+    prices = prices["Adj Close"] if "Adj Close" in prices else prices["Close"]
+
+    # Ajustar caso apenas um ticker seja selecionado
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame()
+        prices.columns = [tickers[0].rstrip(".SA")]
+
+    # Remove o sufixo ".SA" dos nomes das colunas
+    prices.columns = prices.columns.str.rstrip(".SA")
+
+    # Adiciona o IBOV ao DataFrame
+    ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
+    prices['IBOV'] = ibov_data["Adj Close"] if "Adj Close" in ibov_data else ibov_data["Close"]
+
+    return tickers, prices
 
 def calculate_beta(returns, market_returns):
     covariance = np.cov(returns, market_returns)[0][1]
