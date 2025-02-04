@@ -79,7 +79,7 @@ def main_dashboard(tickers, prices):
         c = mygrid.container(border=True)
         c.subheader(t, divider="red")
 
-        colA, colB, colC, colD = c.columns([4, 6, 6, 6])
+        colA, colB, colC, colD = c.columns([2, 6, 6, 6])
         if t == "portfolio":
             colA.image("images/pie-chart-dollar-svgrepo-com.svg", use_container_width=True)
         elif t == "IBOV":
