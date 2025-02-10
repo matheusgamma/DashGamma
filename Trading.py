@@ -388,7 +388,7 @@ def cointegracao(tickers, prices):
 st.set_page_config(layout="wide")
 with st.sidebar:
     tickers, prices = build_sidebar()
-    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos","RRG","Cointegração"])
+    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos","RRG","Cointegração - L&S","Screening Alerts"])
 
 st.title('Gamma Capital - Mercado de Capitais')
 if tickers and prices is not None:
@@ -401,4 +401,6 @@ if tickers and prices is not None:
     elif selected_tab == "Cointegração - L&S":
         multiples_dashboard(tickers)
     elif selected_tab == "RRG":
+        rrg_graph(tickers, prices)
+    elif selected_tab == "Screening alerts":
         rrg_graph(tickers, prices)
