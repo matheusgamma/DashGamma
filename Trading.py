@@ -259,13 +259,16 @@ def rrg_graph():
             return
 
         # 6. Filtra tickers com dados válidos
-        valid_tickers = [t for t in tickers_filtrados if t in prices_filtrados["Adj Close"].columns]
+        valid_tickers = [t for t in tickers_filtrados if t in prices_filtrados["Close"].columns]
         if not valid_tickers:
             st.error("Nenhum ticker válido encontrado para o setor selecionado.")
             return
 
-        # 7. Usa "Adj Close" se disponível, caso contrário, usa "Close"
-        prices_filtrados = prices_filtrados["Adj Close"] if "Adj Close" in prices_filtrados else prices_filtrados["Close"]
+        # 7. Usa "Close" como alternativa se "Adj Close" não estiver disponível
+        if "Adj Close" in prices_filtrados:
+            prices_filtrados = prices_filtrados["Adj Close"]
+        else:
+            prices_filtrados = prices_filtrados["Close"]
 
         # 8. Ajustar caso apenas um ticker seja selecionado
         if isinstance(prices_filtrados, pd.Series):
@@ -277,7 +280,7 @@ def rrg_graph():
 
         # 10. Adiciona o IBOV ao DataFrame
         ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
-        prices_filtrados['IBOV'] = ibov_data["Adj Close"] if "Adj Close" in ibov_data else ibov_data["Close"]
+        prices_filtrados['IBOV'] = ibov_data["Close"]  # Usa "Close" como alternativa
 
         # 11. Calcula os retornos semanais (para suavizar oscilações diárias)
         weekly_prices = prices_filtrados.resample('W').last()  # Preços no final de cada semana
