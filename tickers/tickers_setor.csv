@@ -14,40 +14,39 @@ ELET6,Energia
 ENBR3,Energia
 EQTL3,Energia
 ENGIE3,Energia
-CYRE3,Imobiliário
-MRVE3,Imobiliário
-MULT3,Imobiliário
-JHSF3,Imobiliário
+CYRE3,ImobiliÃ¡rio
+MRVE3,ImobiliÃ¡rio
+MULT3,ImobiliÃ¡rio
+JHSF3,ImobiliÃ¡rio
 MGLU3,Consumo
 LREN3,Consumo
-AMER3,Consumo
 CVCB3,Consumo
-HAPV3,Saúde
-QUAL3,Saúde
-RADL3,Saúde
-FLRY3,Saúde
+HAPV3,SaÃºde
+QUAL3,SaÃºde
+RADL3,SaÃºde
+FLRY3,SaÃºde
 VIVT3,Tecnologia
 TIMS3,Tecnologia
 TOTS3,Tecnologia
 WEGE3,Tecnologia
-VALE3,Materiais Básicos
-GGBR4,Materiais Básicos
-USIM5,Materiais Básicos
-CSNA3,Materiais Básicos
-SUZB3,Materiais Básicos
-BRKM5,Materiais Básicos
-EMBR3,Indústria
-AZUL4,Indústria
-GOLL4,Indústria
-ECOR3,Indústria
-RAPT4,Indústria
-TUPY3,Indústria
-BRFS3,Agropecuária
-JBSS3,Agropecuária
-SLCE3,Agropecuária
-SMTO3,Agropecuária
-SBSP3,Utilidade Pública
-CMIG4,Utilidade Pública
-CPLE6,Utilidade Pública
-TAEE11,Utilidade Pública
-TRPL4,Utilidade Pública
+VALE3,Materiais BÃ¡sicos
+GGBR4,Materiais BÃ¡sicos
+USIM5,Materiais BÃ¡sicos
+CSNA3,Materiais BÃ¡sicos
+SUZB3,Materiais BÃ¡sicos
+BRKM5,Materiais BÃ¡sicos
+EMBR3,IndÃºstria
+AZUL4,IndÃºstria
+GOLL4,IndÃºstria
+ECOR3,IndÃºstria
+RAPT4,IndÃºstria
+TUPY3,IndÃºstria
+BRFS3,AgropecuÃ¡ria
+JBSS3,AgropecuÃ¡ria
+SLCE3,AgropecuÃ¡ria
+SMTO3,AgropecuÃ¡ria
+SBSP3,Utilidade PÃºblica
+CMIG4,Utilidade PÃºblica
+CPLE6,Utilidade PÃºblica
+TAEE11,Utilidade PÃºblica
+TRPL4,Utilidade PÃºblica
