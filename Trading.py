@@ -240,7 +240,7 @@ def rrg_graph():
         setor_data = pd.read_csv("tickers/tickers_setor.csv", encoding='latin1')  # Usando 'latin1'
         setores = setor_data["Setor"].unique()
 
-        # 2. Adiciona um combo box para seleção de setor
+        # 2. Adiciona um combo box para seleção de setor (fora do sidebar)
         setor_selecionado = st.selectbox("Selecione o Setor", setores)
 
         # 3. Filtra os tickers com base no setor selecionado
