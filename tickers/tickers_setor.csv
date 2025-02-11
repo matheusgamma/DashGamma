@@ -18,28 +18,18 @@ CYRE3,Imobiliário
 MRVE3,Imobiliário
 MULT3,Imobiliário
 JHSF3,Imobiliário
-IGTA3,Imobiliário
-BRML3,Imobiliário
-VVAR3,Imobiliário
-VVAR3,Consumo
 MGLU3,Consumo
-BTOW3,Consumo
 LREN3,Consumo
-NATU3,Consumo
 AMER3,Consumo
 CVCB3,Consumo
 HAPV3,Saúde
-GNDI3,Saúde
 QUAL3,Saúde
 RADL3,Saúde
 FLRY3,Saúde
-PFRM3,Saúde
 VIVT3,Tecnologia
 TIMS3,Tecnologia
 TOTS3,Tecnologia
-LINX3,Tecnologia
 WEGE3,Tecnologia
-CIEL3,Tecnologia
 VALE3,Materiais Básicos
 GGBR4,Materiais Básicos
 USIM5,Materiais Básicos
@@ -55,7 +45,6 @@ TUPY3,Indústria
 BRFS3,Agropecuária
 JBSS3,Agropecuária
 SLCE3,Agropecuária
-SLCJ11,Agropecuária
 SMTO3,Agropecuária
 SBSP3,Utilidade Pública
 CMIG4,Utilidade Pública
