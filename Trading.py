@@ -240,7 +240,7 @@ def rrg_graph(tickers, prices):
     st.subheader("Relative Rotation Graph (RRG)")
 
     # 1. Carrega o mapeamento de tickers por setor
-    setor_data = pd.read_csv("tickers/tickers_setor.csv")  # Certifique-se de que o arquivo existe
+    setor_data = pd.read_csv("tickers/tickers_setor.csv", encoding='utf-8')  # Tente 'utf-8' primeiro  # Certifique-se de que o arquivo existe
     setores = setor_data["Setor"].unique()
 
     # 2. Adiciona um combo box para seleção de setor
