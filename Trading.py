@@ -239,117 +239,130 @@ def rrg_graph(tickers, prices):
 
     st.subheader("Relative Rotation Graph (RRG)")
 
-    # 1. Carrega o mapeamento de tickers por setor
-    setor_data = pd.read_csv("tickers/tickers_setor.csv", encoding='latin1') 
-    setores = setor_data["Setor"].unique()
+    try:
+        # 1. Carrega o mapeamento de tickers por setor
+        setor_data = pd.read_csv("tickers/tickers_setor.csv", encoding='latin1')  # Usando 'latin1'
+        setores = setor_data["Setor"].unique()
 
-    # 2. Adiciona um combo box para seleção de setor
-    setor_selecionado = st.selectbox("Selecione o Setor", setores)
+        # 2. Adiciona um combo box para seleção de setor
+        setor_selecionado = st.selectbox("Selecione o Setor", setores)
 
-    # 3. Filtra os tickers com base no setor selecionado
-    tickers_filtrados = setor_data[setor_data["Setor"] == setor_selecionado]["Ticker"].tolist()
-    tickers_filtrados = [t + ".SA" for t in tickers_filtrados]
+        # 3. Filtra os tickers com base no setor selecionado
+        tickers_filtrados = setor_data[setor_data["Setor"] == setor_selecionado]["Ticker"].tolist()
+        tickers_filtrados = [t + ".SA" for t in tickers_filtrados]
 
-    # 4. Baixa os preços dos tickers filtrados
-    prices_filtrados = yf.download(tickers_filtrados, start=prices.index[0], end=prices.index[-1])
+        # 4. Baixa os preços dos tickers filtrados
+        prices_filtrados = yf.download(tickers_filtrados, start=prices.index[0], end=prices.index[-1])
 
-    if prices_filtrados.empty:
-        st.error("Não foi possível obter dados para os tickers do setor selecionado.")
-        return
+        if prices_filtrados.empty:
+            st.error("Não foi possível obter dados para os tickers do setor selecionado.")
+            return
 
-    # 5. Usa "Adj Close" se disponível, caso contrário, usa "Close"
-    prices_filtrados = prices_filtrados["Adj Close"] if "Adj Close" in prices_filtrados else prices_filtrados["Close"]
+        # 5. Usa "Adj Close" se disponível, caso contrário, usa "Close"
+        prices_filtrados = prices_filtrados["Adj Close"] if "Adj Close" in prices_filtrados else prices_filtrados["Close"]
 
-    # 6. Ajustar caso apenas um ticker seja selecionado
-    if isinstance(prices_filtrados, pd.Series):
-        prices_filtrados = prices_filtrados.to_frame()
-        prices_filtrados.columns = [tickers_filtrados[0].rstrip(".SA")]
+        # 6. Ajustar caso apenas um ticker seja selecionado
+        if isinstance(prices_filtrados, pd.Series):
+            prices_filtrados = prices_filtrados.to_frame()
+            prices_filtrados.columns = [tickers_filtrados[0].rstrip(".SA")]
 
-    # 7. Remove o sufixo ".SA" dos nomes das colunas
-    prices_filtrados.columns = prices_filtrados.columns.str.rstrip(".SA")
+        # 7. Remove o sufixo ".SA" dos nomes das colunas
+        prices_filtrados.columns = prices_filtrados.columns.str.rstrip(".SA")
 
-    # 8. Adiciona o IBOV ao DataFrame
-    ibov_data = yf.download("^BVSP", start=prices.index[0], end=prices.index[-1])
-    prices_filtrados['IBOV'] = ibov_data["Adj Close"] if "Adj Close" in ibov_data else ibov_data["Close"]
+        # 8. Adiciona o IBOV ao DataFrame
+        ibov_data = yf.download("^BVSP", start=prices.index[0], end=prices.index[-1])
+        prices_filtrados['IBOV'] = ibov_data["Adj Close"] if "Adj Close" in ibov_data else ibov_data["Close"]
 
-    # 9. Calcula os retornos semanais (para suavizar oscilações diárias)
-    weekly_prices = prices_filtrados.resample('W').last()  # Preços no final de cada semana
-    weekly_returns = weekly_prices.pct_change().dropna()
+        # 9. Calcula os retornos semanais (para suavizar oscilações diárias)
+        weekly_prices = prices_filtrados.resample('W').last()  # Preços no final de cada semana
+        weekly_returns = weekly_prices.pct_change().dropna()
 
-    # 10. Calcula a força relativa (RS) em relação ao benchmark (IBOV)
-    benchmark_returns = weekly_returns["IBOV"]
-    relative_strength = weekly_returns.div(benchmark_returns, axis=0) - 1
+        if weekly_returns.empty:
+            st.error("Não há dados suficientes para calcular os retornos semanais.")
+            return
 
-    # 11. Calcula o momentum (diferença da força relativa em um período)
-    lookback_period = 12  # Período de 12 semanas para calcular o momentum
-    momentum = relative_strength - relative_strength.shift(lookback_period)
+        # 10. Calcula a força relativa (RS) em relação ao benchmark (IBOV)
+        benchmark_returns = weekly_returns["IBOV"]
+        relative_strength = weekly_returns.div(benchmark_returns, axis=0) - 1
 
-    # 12. Normaliza os dados para facilitar a comparação
-    relative_strength_norm = (relative_strength - relative_strength.mean()) / relative_strength.std()
-    momentum_norm = (momentum - momentum.mean()) / momentum.std()
+        # 11. Calcula o momentum (diferença da força relativa em um período)
+        lookback_period = 12  # Período de 12 semanas para calcular o momentum
+        momentum = relative_strength - relative_strength.shift(lookback_period)
 
-    # 13. Prepara os dados para o gráfico
-    data = pd.DataFrame({
-        "Ticker": relative_strength_norm.columns,
-        "Relative Strength": relative_strength_norm.iloc[-1].values,
-        "Momentum": momentum_norm.iloc[-1].values,
-    })
+        # 12. Normaliza os dados para facilitar a comparação
+        relative_strength_norm = (relative_strength - relative_strength.mean()) / relative_strength.std()
+        momentum_norm = (momentum - momentum.mean()) / momentum.std()
 
-    # 14. Define os quadrantes
-    data['Quadrante'] = np.where(
-        (data['Relative Strength'] > 0) & (data['Momentum'] > 0), "Líderes",
-        np.where(
-            (data['Relative Strength'] < 0) & (data['Momentum'] > 0), "Melhorando",
+        # 13. Verifica se há dados válidos para o gráfico
+        if relative_strength_norm.empty or momentum_norm.empty:
+            st.error("Não há dados suficientes para gerar o gráfico RRG.")
+            return
+
+        # 14. Prepara os dados para o gráfico
+        data = pd.DataFrame({
+            "Ticker": relative_strength_norm.columns,
+            "Relative Strength": relative_strength_norm.iloc[-1].values,
+            "Momentum": momentum_norm.iloc[-1].values,
+        })
+
+        # 15. Define os quadrantes
+        data['Quadrante'] = np.where(
+            (data['Relative Strength'] > 0) & (data['Momentum'] > 0), "Líderes",
             np.where(
-                (data['Relative Strength'] > 0) & (data['Momentum'] < 0), "Enfraquecendo",
-                "Defasados"
+                (data['Relative Strength'] < 0) & (data['Momentum'] > 0), "Melhorando",
+                np.where(
+                    (data['Relative Strength'] > 0) & (data['Momentum'] < 0), "Enfraquecendo",
+                    "Defasados"
+                )
             )
         )
-    )
 
-    # 15. Cores para cada quadrante
-    quadrant_colors = {
-        "Líderes": "green",
-        "Melhorando": "blue",
-        "Enfraquecendo": "orange",
-        "Defasados": "red",
-    }
+        # 16. Cores para cada quadrante
+        quadrant_colors = {
+            "Líderes": "green",
+            "Melhorando": "blue",
+            "Enfraquecendo": "orange",
+            "Defasados": "red",
+        }
 
-    # 16. Plota o gráfico RRG usando Plotly
-    fig = px.scatter(
-        data,
-        x="Relative Strength",
-        y="Momentum",
-        text="Ticker",
-        color="Quadrante",
-        color_discrete_map=quadrant_colors,
-        labels={"Relative Strength": "Força Relativa", "Momentum": "Momentum"},
-        title=f"Relative Rotation Graph (RRG) - Setor: {setor_selecionado}",
-        template="plotly_dark",
-    )
+        # 17. Plota o gráfico RRG usando Plotly
+        fig = px.scatter(
+            data,
+            x="Relative Strength",
+            y="Momentum",
+            text="Ticker",
+            color="Quadrante",
+            color_discrete_map=quadrant_colors,
+            labels={"Relative Strength": "Força Relativa", "Momentum": "Momentum"},
+            title=f"Relative Rotation Graph (RRG) - Setor: {setor_selecionado}",
+            template="plotly_dark",
+        )
 
-    # 17. Adiciona quadrantes e linhas de referência
-    fig.add_shape(type="line", x0=0, y0=-2, x1=0, y1=2, line=dict(color="white", dash="dash"))
-    fig.add_shape(type="line", x0=-2, y0=0, x1=2, y1=0, line=dict(color="white", dash="dash"))
+        # 18. Adiciona quadrantes e linhas de referência
+        fig.add_shape(type="line", x0=0, y0=-2, x1=0, y1=2, line=dict(color="white", dash="dash"))
+        fig.add_shape(type="line", x0=-2, y0=0, x1=2, y1=0, line=dict(color="white", dash="dash"))
 
-    # 18. Adiciona anotações para os quadrantes
-    fig.add_annotation(x=1, y=1, text="Líderes", showarrow=False, font=dict(color="green", size=14))
-    fig.add_annotation(x=-1, y=1, text="Melhorando", showarrow=False, font=dict(color="blue", size=14))
-    fig.add_annotation(x=1, y=-1, text="Enfraquecendo", showarrow=False, font=dict(color="orange", size=14))
-    fig.add_annotation(x=-1, y=-1, text="Defasados", showarrow=False, font=dict(color="red", size=14))
+        # 19. Adiciona anotações para os quadrantes
+        fig.add_annotation(x=1, y=1, text="Líderes", showarrow=False, font=dict(color="green", size=14))
+        fig.add_annotation(x=-1, y=1, text="Melhorando", showarrow=False, font=dict(color="blue", size=14))
+        fig.add_annotation(x=1, y=-1, text="Enfraquecendo", showarrow=False, font=dict(color="orange", size=14))
+        fig.add_annotation(x=-1, y=-1, text="Defasados", showarrow=False, font=dict(color="red", size=14))
 
-    # 19. Ajusta o layout
-    fig.update_traces(
-        marker=dict(size=15, line=dict(width=2, color="DarkSlateGrey")),
-        textposition="top center",
-    )
-    fig.update_layout(
-        xaxis_range=[-2, 2],  # Ajuste conforme necessário
-        yaxis_range=[-2, 2],  # Ajuste conforme necessário
-        showlegend=False,  # Remove a legenda padrão
-    )
+        # 20. Ajusta o layout
+        fig.update_traces(
+            marker=dict(size=15, line=dict(width=2, color="DarkSlateGrey")),
+            textposition="top center",
+        )
+        fig.update_layout(
+            xaxis_range=[-2, 2],  # Ajuste conforme necessário
+            yaxis_range=[-2, 2],  # Ajuste conforme necessário
+            showlegend=False,  # Remove a legenda padrão
+        )
 
-    st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Erro ao processar o arquivo CSV ou gerar o gráfico RRG: {e}")
 
 
 
