@@ -229,14 +229,10 @@ def multiples_dashboard(tickers):
 
 
 
-def rrg_graph(tickers, prices):
+def rrg_graph():
     """
     Gera o gráfico RRG (Relative Rotation Graph) com filtro por setor.
     """
-    if not tickers or prices.empty:
-        st.warning("Não há dados suficientes para gerar o gráfico RRG.")
-        return
-
     st.subheader("Relative Rotation Graph (RRG)")
 
     try:
@@ -251,61 +247,65 @@ def rrg_graph(tickers, prices):
         tickers_filtrados = setor_data[setor_data["Setor"] == setor_selecionado]["Ticker"].tolist()
         tickers_filtrados = [t + ".SA" for t in tickers_filtrados]
 
-        # 4. Baixa os preços dos tickers filtrados
-        prices_filtrados = yf.download(tickers_filtrados, start=prices.index[0], end=prices.index[-1])
+        # 4. Define o período de análise (últimos 2 anos)
+        end_date = datetime.now()
+        start_date = end_date - pd.DateOffset(years=2)
+
+        # 5. Baixa os preços dos tickers filtrados
+        prices_filtrados = yf.download(tickers_filtrados, start=start_date, end=end_date)
 
         if prices_filtrados.empty:
             st.error("Não foi possível obter dados para os tickers do setor selecionado.")
             return
 
-        # 5. Usa "Adj Close" se disponível, caso contrário, usa "Close"
+        # 6. Usa "Adj Close" se disponível, caso contrário, usa "Close"
         prices_filtrados = prices_filtrados["Adj Close"] if "Adj Close" in prices_filtrados else prices_filtrados["Close"]
 
-        # 6. Ajustar caso apenas um ticker seja selecionado
+        # 7. Ajustar caso apenas um ticker seja selecionado
         if isinstance(prices_filtrados, pd.Series):
             prices_filtrados = prices_filtrados.to_frame()
             prices_filtrados.columns = [tickers_filtrados[0].rstrip(".SA")]
 
-        # 7. Remove o sufixo ".SA" dos nomes das colunas
+        # 8. Remove o sufixo ".SA" dos nomes das colunas
         prices_filtrados.columns = prices_filtrados.columns.str.rstrip(".SA")
 
-        # 8. Adiciona o IBOV ao DataFrame
-        ibov_data = yf.download("^BVSP", start=prices.index[0], end=prices.index[-1])
+        # 9. Adiciona o IBOV ao DataFrame
+        ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
         prices_filtrados['IBOV'] = ibov_data["Adj Close"] if "Adj Close" in ibov_data else ibov_data["Close"]
 
-        # 9. Calcula os retornos semanais (para suavizar oscilações diárias)
+        # 10. Calcula os retornos semanais (para suavizar oscilações diárias)
         weekly_prices = prices_filtrados.resample('W').last()  # Preços no final de cada semana
         weekly_returns = weekly_prices.pct_change().dropna()
 
-        if weekly_returns.empty:
+        if weekly_returns.empty or len(weekly_returns) < 2:  # Verifica se há dados suficientes
             st.error("Não há dados suficientes para calcular os retornos semanais.")
             return
 
-        # 10. Calcula a força relativa (RS) em relação ao benchmark (IBOV)
+        # 11. Calcula a força relativa (RS) em relação ao benchmark (IBOV)
         benchmark_returns = weekly_returns["IBOV"]
         relative_strength = weekly_returns.div(benchmark_returns, axis=0) - 1
 
-        # 11. Calcula o momentum (diferença da força relativa em um período)
+        # 12. Calcula o momentum (diferença da força relativa em um período)
         lookback_period = 12  # Período de 12 semanas para calcular o momentum
         momentum = relative_strength - relative_strength.shift(lookback_period)
 
-        # 12. Normaliza os dados para facilitar a comparação
+        # 13. Normaliza os dados para facilitar a comparação
         relative_strength_norm = (relative_strength - relative_strength.mean()) / relative_strength.std()
         momentum_norm = (momentum - momentum.mean()) / momentum.std()
 
-        # 13. Verifica se há dados válidos para o gráfico
+        # 14. Verifica se há dados válidos para o gráfico
         if relative_strength_norm.empty or momentum_norm.empty:
             st.error("Não há dados suficientes para gerar o gráfico RRG.")
             return
 
-        # 14. Prepara os dados para o gráfico
+        # 15. Prepara os dados para o gráfico
         data = pd.DataFrame({
             "Ticker": relative_strength_norm.columns,
             "Relative Strength": relative_strength_norm.iloc[-1].values,
             "Momentum": momentum_norm.iloc[-1].values,
         })
 
-        # 15. Define os quadrantes
+        # 16. Define os quadrantes
         data['Quadrante'] = np.where(
             (data['Relative Strength'] > 0) & (data['Momentum'] > 0), "Líderes",
             np.where(
@@ -317,7 +317,7 @@ def rrg_graph(tickers, prices):
             )
         )
 
-        # 16. Cores para cada quadrante
+        # 17. Cores para cada quadrante
         quadrant_colors = {
             "Líderes": "green",
             "Melhorando": "blue",
@@ -325,7 +325,7 @@ def rrg_graph(tickers, prices):
             "Defasados": "red",
         }
 
-        # 17. Plota o gráfico RRG usando Plotly
+        # 18. Plota o gráfico RRG usando Plotly
         fig = px.scatter(
             data,
             x="Relative Strength",
@@ -338,17 +338,17 @@ def rrg_graph(tickers, prices):
             template="plotly_dark",
         )
 
-        # 18. Adiciona quadrantes e linhas de referência
+        # 19. Adiciona quadrantes e linhas de referência
         fig.add_shape(type="line", x0=0, y0=-2, x1=0, y1=2, line=dict(color="white", dash="dash"))
         fig.add_shape(type="line", x0=-2, y0=0, x1=2, y1=0, line=dict(color="white", dash="dash"))
 
-        # 19. Adiciona anotações para os quadrantes
+        # 20. Adiciona anotações para os quadrantes
         fig.add_annotation(x=1, y=1, text="Líderes", showarrow=False, font=dict(color="green", size=14))
         fig.add_annotation(x=-1, y=1, text="Melhorando", showarrow=False, font=dict(color="blue", size=14))
         fig.add_annotation(x=1, y=-1, text="Enfraquecendo", showarrow=False, font=dict(color="orange", size=14))
         fig.add_annotation(x=-1, y=-1, text="Defasados", showarrow=False, font=dict(color="red", size=14))
 
-        # 20. Ajusta o layout
+        # 21. Ajusta o layout
         fig.update_traces(
             marker=dict(size=15, line=dict(width=2, color="DarkSlateGrey")),
             textposition="top center",
