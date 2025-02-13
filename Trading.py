@@ -286,7 +286,7 @@ def rrg_graph():
         weekly_prices = prices_filtrados.resample('W').last()  # Preços no final de cada semana
         weekly_returns = weekly_prices.pct_change().dropna()
 
-        if weekly_returns.empty or len(weekly_returns) < 2:  # Verifica se há dados suficientes
+        if weekly_returns.empty or len(weekly_returns) < 4:  # Verifica se há dados suficientes
             st.error("Não há dados suficientes para calcular os retornos semanais.")
             return
 
