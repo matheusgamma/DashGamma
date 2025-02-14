@@ -454,6 +454,4 @@ if tickers and prices is not None:
     elif selected_tab == "Cointegração - L&S":
         multiples_dashboard(tickers)
     elif selected_tab == "RRG":
-        rrg_graph(tickers, prices)
-    elif selected_tab == "Screening alerts":
-        rrg_graph(tickers, prices)
+        rrg_graph()
