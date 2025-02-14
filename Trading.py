@@ -437,76 +437,23 @@ def cointegracao(tickers, prices):
         st.plotly_chart(fig, use_container_width=True)
 
 
-
-
-# Configuração inicial
 # Configuração inicial
 st.set_page_config(layout="wide")
+with st.sidebar:
+    tickers, prices = build_sidebar()
+    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos","RRG","Cointegração - L&S","Screening Alerts"])
 
-def main():
-    # 1. Carrega a lista de tickers do repositório (caminho relativo)
-    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  # Certifique-se de que o CSV está na pasta "tickers"
-
-    # 2. Adiciona um radio button para seleção de aba
-    selected_tab = st.radio(
-        "Escolha a visualização", 
-        ["Dashboard", "Correlação", "Múltiplos", "RRG", "Cointegração - L&S", "Screening Alerts"]
-    )
-
-    # 3. Exibe a lista de seleção de empresas apenas nas abas relevantes
-    if selected_tab != "RRG":
-        with st.sidebar:
-            st.image("images/Gamma-XP.png")  # Certifique-se de que a imagem está na pasta "images"
-            tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
-            tickers = [t + ".SA" for t in tickers]
-            start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
-            end_date = st.date_input("Até", value=datetime.now().date(), format="YYYY-MM-DD")
-
-            if not tickers:
-                st.warning("Por favor, selecione pelo menos um ticker.")
-                return None, None
-
-            # Baixa os preços dos tickers selecionados
-            prices = yf.download(tickers, start=start_date, end=end_date)
-
-            if prices.empty:
-                st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
-                return None, None
-
-            # Usa "Adj Close" se disponível, caso contrário, usa "Close"
-            prices = prices["Adj Close"] if "Adj Close" in prices else prices["Close"]
-
-            # Ajustar caso apenas um ticker seja selecionado
-            if isinstance(prices, pd.Series):
-                prices = prices.to_frame()
-                prices.columns = [tickers[0].rstrip(".SA")]
-
-            # Remove o sufixo ".SA" dos nomes das colunas
-            prices.columns = prices.columns.str.rstrip(".SA")
-
-            # Adiciona o IBOV ao DataFrame
-            ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
-            prices['IBOV'] = ibov_data["Adj Close"] if "Adj Close" in ibov_data else ibov_data["Close"]
-
-    # 4. Renderiza a aba selecionada
-    st.title('Gamma Capital - Mercado de Capitais')
+st.title('Gamma Capital - Mercado de Capitais')
+if tickers and prices is not None:
     if selected_tab == "Dashboard":
-        if tickers and prices is not None:
-            main_dashboard(tickers, prices)
+        main_dashboard(tickers, prices)
     elif selected_tab == "Correlação":
-        if tickers and prices is not None:
-            correlation_dashboard(prices)
+        correlation_dashboard(prices)
     elif selected_tab == "Múltiplos":
-        if tickers:
-            multiples_dashboard(tickers)
+        multiples_dashboard(tickers)
     elif selected_tab == "Cointegração - L&S":
-        if tickers and prices is not None:
-            cointegracao(tickers, prices)
+        multiples_dashboard(tickers)
     elif selected_tab == "RRG":
-        rrg_graph()  # Combo box de setor aparece aqui
-    elif selected_tab == "Screening Alerts":
-        screening_alerts(tickers, prices)  # Crie uma função específica para essa aba
-
-# Executa o app
-if __name__ == "__main__":
-    main()
+        rrg_graph(tickers, prices)
+    elif selected_tab == "Screening alerts":
+        rrg_graph(tickers, prices)
