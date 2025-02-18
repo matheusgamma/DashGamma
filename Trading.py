@@ -229,9 +229,9 @@ def multiples_dashboard(tickers):
 
 
 
-def rrg_graph():
+def rrg_graph(tickers, prices):
     """
-    Gera o gráfico RRG (Relative Rotation Graph) com filtro por setor.
+    Gera o gráfico RRG (Relative Rotation Graph) com filtro por setor e/ou tickers selecionados.
     """
     st.subheader("Relative Rotation Graph (RRG)")
 
@@ -240,49 +240,55 @@ def rrg_graph():
         setor_data = pd.read_csv("tickers/tickers_setor.csv", encoding='latin1')  # Usando 'latin1'
         setores = setor_data["Setor"].unique()
 
-        # 2. Adiciona um combo box para seleção de setor (fora do sidebar)
+        # 2. Adiciona um combo box para seleção de setor
         setor_selecionado = st.selectbox("Selecione o Setor", setores)
 
         # 3. Filtra os tickers com base no setor selecionado
-        tickers_filtrados = setor_data[setor_data["Setor"] == setor_selecionado]["Ticker"].tolist()
-        tickers_filtrados = [t + ".SA" for t in tickers_filtrados]
+        tickers_setor = setor_data[setor_data["Setor"] == setor_selecionado]["Ticker"].tolist()
+        tickers_setor = [t + ".SA" for t in tickers_setor]
 
-        # 4. Define o período de análise (últimos 2 anos)
+        # 4. Combina os tickers selecionados manualmente com os do setor
+        if tickers:
+            tickers_filtrados = list(set(tickers + tickers_setor))  # Remove duplicatas
+        else:
+            tickers_filtrados = tickers_setor
+
+        # 5. Define o período de análise (últimos 2 anos)
         end_date = datetime.now()
         start_date = end_date - pd.DateOffset(years=2)
 
-        # 5. Baixa os preços dos tickers filtrados
+        # 6. Baixa os preços dos tickers filtrados
         prices_filtrados = yf.download(tickers_filtrados, start=start_date, end=end_date)
 
         if prices_filtrados.empty:
-            st.error("Não foi possível obter dados para os tickers do setor selecionado.")
+            st.error("Não foi possível obter dados para os tickers selecionados.")
             return
 
-        # 6. Filtra tickers com dados válidos
+        # 7. Filtra tickers com dados válidos
         valid_tickers = [t for t in tickers_filtrados if t in prices_filtrados["Close"].columns]
         if not valid_tickers:
-            st.error("Nenhum ticker válido encontrado para o setor selecionado.")
+            st.error("Nenhum ticker válido encontrado.")
             return
 
-        # 7. Usa "Close" como alternativa se "Adj Close" não estiver disponível
+        # 8. Usa "Close" como alternativa se "Adj Close" não estiver disponível
         if "Adj Close" in prices_filtrados:
             prices_filtrados = prices_filtrados["Adj Close"]
         else:
             prices_filtrados = prices_filtrados["Close"]
 
-        # 8. Ajustar caso apenas um ticker seja selecionado
+        # 9. Ajustar caso apenas um ticker seja selecionado
         if isinstance(prices_filtrados, pd.Series):
             prices_filtrados = prices_filtrados.to_frame()
             prices_filtrados.columns = [valid_tickers[0].rstrip(".SA")]
 
-        # 9. Remove o sufixo ".SA" dos nomes das colunas
+        # 10. Remove o sufixo ".SA" dos nomes das colunas
         prices_filtrados.columns = prices_filtrados.columns.str.rstrip(".SA")
 
-        # 10. Adiciona o IBOV ao DataFrame
+        # 11. Adiciona o IBOV ao DataFrame
         ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
         prices_filtrados['IBOV'] = ibov_data["Close"]  # Usa "Close" como alternativa
 
-        # 11. Calcula os retornos semanais (para suavizar oscilações diárias)
+        # 12. Calcula os retornos semanais (para suavizar oscilações diárias)
         weekly_prices = prices_filtrados.resample('W').last()  # Preços no final de cada semana
         weekly_returns = weekly_prices.pct_change().dropna()
 
@@ -290,31 +296,31 @@ def rrg_graph():
             st.error("Não há dados suficientes para calcular os retornos semanais.")
             return
 
-        # 12. Calcula a força relativa (RS) em relação ao benchmark (IBOV)
+        # 13. Calcula a força relativa (RS) em relação ao benchmark (IBOV)
         benchmark_returns = weekly_returns["IBOV"]
         relative_strength = weekly_returns.div(benchmark_returns, axis=0) - 1
 
-        # 13. Calcula o momentum (diferença da força relativa em um período)
+        # 14. Calcula o momentum (diferença da força relativa em um período)
         lookback_period = 12  # Período de 12 semanas para calcular o momentum
         momentum = relative_strength - relative_strength.shift(lookback_period)
 
-        # 14. Normaliza os dados para facilitar a comparação
+        # 15. Normaliza os dados para facilitar a comparação
         relative_strength_norm = (relative_strength - relative_strength.mean()) / relative_strength.std()
         momentum_norm = (momentum - momentum.mean()) / momentum.std()
 
-        # 15. Verifica se há dados válidos para o gráfico
+        # 16. Verifica se há dados válidos para o gráfico
         if relative_strength_norm.empty or momentum_norm.empty:
             st.error("Não há dados suficientes para gerar o gráfico RRG.")
             return
 
-        # 16. Prepara os dados para o gráfico
+        # 17. Prepara os dados para o gráfico
         data = pd.DataFrame({
             "Ticker": relative_strength_norm.columns,
             "Relative Strength": relative_strength_norm.iloc[-1].values,
             "Momentum": momentum_norm.iloc[-1].values,
         })
 
-        # 17. Define os quadrantes
+        # 18. Define os quadrantes
         data['Quadrante'] = np.where(
             (data['Relative Strength'] > 0) & (data['Momentum'] > 0), "Líderes",
             np.where(
@@ -326,7 +332,7 @@ def rrg_graph():
             )
         )
 
-        # 18. Cores para cada quadrante
+        # 19. Cores para cada quadrante
         quadrant_colors = {
             "Líderes": "green",
             "Melhorando": "blue",
@@ -334,7 +340,7 @@ def rrg_graph():
             "Defasados": "red",
         }
 
-        # 19. Plota o gráfico RRG usando Plotly
+        # 20. Plota o gráfico RRG usando Plotly
         fig = px.scatter(
             data,
             x="Relative Strength",
@@ -347,17 +353,17 @@ def rrg_graph():
             template="plotly_dark",
         )
 
-        # 20. Adiciona quadrantes e linhas de referência
+        # 21. Adiciona quadrantes e linhas de referência
         fig.add_shape(type="line", x0=0, y0=-2, x1=0, y1=2, line=dict(color="white", dash="dash"))
         fig.add_shape(type="line", x0=-2, y0=0, x1=2, y1=0, line=dict(color="white", dash="dash"))
 
-        # 21. Adiciona anotações para os quadrantes
+        # 22. Adiciona anotações para os quadrantes
         fig.add_annotation(x=1, y=1, text="Líderes", showarrow=False, font=dict(color="green", size=14))
         fig.add_annotation(x=-1, y=1, text="Melhorando", showarrow=False, font=dict(color="blue", size=14))
         fig.add_annotation(x=1, y=-1, text="Enfraquecendo", showarrow=False, font=dict(color="orange", size=14))
         fig.add_annotation(x=-1, y=-1, text="Defasados", showarrow=False, font=dict(color="red", size=14))
 
-        # 22. Ajusta o layout
+        # 23. Ajusta o layout
         fig.update_traces(
             marker=dict(size=15, line=dict(width=2, color="DarkSlateGrey")),
             textposition="top center",
@@ -439,19 +445,71 @@ def cointegracao(tickers, prices):
 
 # Configuração inicial
 st.set_page_config(layout="wide")
-with st.sidebar:
-    tickers, prices = build_sidebar()
-    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos","RRG","Cointegração - L&S","Screening Alerts"])
 
-st.title('Gamma Capital - Mercado de Capitais')
-if tickers and prices is not None:
+def main():
+    # 1. Carrega a lista de tickers do repositório (caminho relativo)
+    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  # Certifique-se de que o CSV está na pasta "tickers"
+
+    # 2. Adiciona um radio button para seleção de aba
+    selected_tab = st.radio(
+        "Escolha a visualização", 
+        ["Dashboard", "Correlação", "Múltiplos", "RRG", "Cointegração - L&S", "Screening Alerts"]
+    )
+
+    # 3. Exibe a lista de seleção de empresas apenas nas abas relevantes
+    if selected_tab != "RRG":
+        with st.sidebar:
+            st.image("images/Gamma-XP.png")  # Certifique-se de que a imagem está na pasta "images"
+            tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
+            tickers = [t + ".SA" for t in tickers]
+            start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
+            end_date = st.date_input("Até", value=datetime.now().date(), format="YYYY-MM-DD")
+
+            if not tickers:
+                st.warning("Por favor, selecione pelo menos um ticker.")
+                return None, None
+
+            # Baixa os preços dos tickers selecionados
+            prices = yf.download(tickers, start=start_date, end=end_date)
+
+            if prices.empty:
+                st.error("Não foi possível obter dados para os tickers selecionados. Verifique os códigos ou tente novamente.")
+                return None, None
+
+            # Usa "Adj Close" se disponível, caso contrário, usa "Close"
+            prices = prices["Adj Close"] if "Adj Close" in prices else prices["Close"]
+
+            # Ajustar caso apenas um ticker seja selecionado
+            if isinstance(prices, pd.Series):
+                prices = prices.to_frame()
+                prices.columns = [tickers[0].rstrip(".SA")]
+
+            # Remove o sufixo ".SA" dos nomes das colunas
+            prices.columns = prices.columns.str.rstrip(".SA")
+
+            # Adiciona o IBOV ao DataFrame
+            ibov_data = yf.download("^BVSP", start=start_date, end=end_date)
+            prices['IBOV'] = ibov_data["Adj Close"] if "Adj Close" in ibov_data else ibov_data["Close"]
+
+    # 4. Renderiza a aba selecionada
+    st.title('Gamma Capital - Mercado de Capitais')
     if selected_tab == "Dashboard":
-        main_dashboard(tickers, prices)
+        if tickers and prices is not None:
+            main_dashboard(tickers, prices)
     elif selected_tab == "Correlação":
-        correlation_dashboard(prices)
+        if tickers and prices is not None:
+            correlation_dashboard(prices)
     elif selected_tab == "Múltiplos":
-        multiples_dashboard(tickers)
+        if tickers:
+            multiples_dashboard(tickers)
     elif selected_tab == "Cointegração - L&S":
-        multiples_dashboard(tickers)
+        if tickers and prices is not None:
+            cointegracao(tickers, prices)
     elif selected_tab == "RRG":
-        rrg_graph()
+        rrg_graph(tickers, prices)  # Passa os tickers selecionados para o RRG
+    elif selected_tab == "Screening Alerts":
+        screening_alerts(tickers, prices)  # Crie uma função específica para essa aba
+
+# Executa o app
+if __name__ == "__main__":
+    main()
