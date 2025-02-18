@@ -506,7 +506,7 @@ def main():
         if tickers and prices is not None:
             cointegracao(tickers, prices)
     elif selected_tab == "RRG":
-        rrg_graph(tickers, prices)  # Passa os tickers selecionados para o RRG
+        rrg_graph()  # Passa os tickers selecionados para o RRG
     elif selected_tab == "Screening Alerts":
         screening_alerts(tickers, prices)  # Crie uma função específica para essa aba
 
