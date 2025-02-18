@@ -509,7 +509,6 @@ def main():
         rrg_graph()  # Passa os tickers selecionados para o RRG
     elif selected_tab == "Screening Alerts":
         screening_alerts(tickers, prices)  # Crie uma função específica para essa aba
-
 # Executa o app
 if __name__ == "__main__":
     main()
