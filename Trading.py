@@ -241,7 +241,7 @@ def rrg_graph(tickers, prices):
         setores = setor_data["Setor"].unique()
 
         # 2. Adiciona um combo box para seleção de setor
-        setor_selecionado = st.selectbox("Selecione o Setor", ["Todos"] + list(setores))
+        setor_selecionado = st.selectbox("Selecione o Setor", ["Nenhum"] + list(setores))
 
         # 3. Filtra os tickers com base no setor selecionado
         if setor_selecionado == "Todos":
