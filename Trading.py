@@ -460,11 +460,13 @@ def screening_alerts():
     # Carrega a lista de tickers do arquivo
     try:
         ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
+        ticker_list.index = ticker_list.index.astype(str)  # Garante que os tickers sejam strings
         tickers = [t + ".SA" for t in ticker_list.index]
     except Exception as e:
         st.error(f"Erro ao carregar a lista de tickers: {e}")
         return
 
+    
     # Baixa os dados de preços para todos os tickers
     try:
         prices = yf.download(tickers, period="6mo")  # Últimos 6 meses de dados
