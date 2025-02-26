@@ -459,9 +459,9 @@ def screening_alerts():
 
     # Carrega a lista de tickers do arquivo
     try:
-        # Lê o arquivo CSV ignorando a coluna numérica
-        ticker_list = pd.read_csv("tickers/tickers_ibra.csv", header=None)
-        tickers = [t + ".SA" for t in ticker_list[2]]  # Usa a segunda coluna (tickers)
+        # Lê o arquivo CSV com um separador de vírgula e sem cabeçalho
+        ticker_list = pd.read_csv("tickers/tickers_ibra.csv", header=None, sep=",")
+        tickers = [t + ".SA" for t in ticker_list[1]]  # Usa a segunda coluna (tickers)
     except Exception as e:
         st.error(f"Erro ao carregar a lista de tickers: {e}")
         return
