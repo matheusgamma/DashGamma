@@ -454,9 +454,9 @@ def cointegracao(tickers, prices):
 
 def screening_alerts():
     """
-    Verifica setups gráficos para todos os tickers do arquivo e exibe alertas.
+    Verifica setups gráficos (9.1, 9.2, 9.3, 9.4) para todos os tickers do arquivo e exibe alertas.
     """
-    st.subheader("Screening Alerts - Setups Gráficos")
+    st.subheader("Screening Alerts - Setups 9.1, 9.2, 9.3 e 9.4 (Timeframe Diário)")
 
     # Carrega a lista de tickers do arquivo
     try:
@@ -478,7 +478,8 @@ def screening_alerts():
             if not batch:
                 continue
             try:
-                batch_data = yf.download(batch, period="6mo", progress=False)  # Baixa os dados do lote
+                # Baixa os dados diários
+                batch_data = yf.download(batch, period="6mo", interval="1d", progress=False)
                 if "Adj Close" in batch_data:
                     batch_prices = batch_data["Adj Close"]
                 else:
@@ -505,82 +506,76 @@ def screening_alerts():
             if len(data) < 20:  # Verifica se há dados suficientes
                 continue
 
-            # 1. Trap do Urso/Compra (Bear Trap)
-            if len(data) >= 3:
-                resistance = data[-3:].max()  # Resistência recente
-                if data.iloc[-1] > resistance and data.iloc[-2] < resistance:
-                    alerts.append({
-                        "Ticker": ticker,
-                        "Setup": "Trap do Urso/Compra",
-                        "Tipo": "Compra",
-                        "Descrição": f"Preço rompeu a resistência {resistance:.2f} e reverteu.",
-                        "Data": data.index[-1].strftime("%Y-%m-%d")
-                    })
+            # Calcula a MME de 9 períodos
+            mme_9 = data.rolling(window=9).mean()
 
-            # 2. Spring (Falso rompimento de suporte)
-            if len(data) >= 3:
-                support = data[-3:].min()  # Suporte recente
-                if data.iloc[-1] < support and data.iloc[-2] > support:
-                    alerts.append({
-                        "Ticker": ticker,
-                        "Setup": "Spring",
-                        "Tipo": "Compra",
-                        "Descrição": f"Preço rompeu o suporte {support:.2f} e reverteu.",
-                        "Data": data.index[-1].strftime("%Y-%m-%d")
-                    })
+            # Preço atual e fechamento anterior
+            current_close = data.iloc[-1]
+            previous_close = data.iloc[-2]
+            current_mme = mme_9.iloc[-1]
+            previous_mme = mme_9.iloc[-2]
 
-            # 3. Double Top/Double Bottom
-            if len(data) >= 5:
-                top1 = data.iloc[-3]  # Primeiro topo/fundo
-                top2 = data.iloc[-1]  # Segundo topo/fundo
-                if abs(top1 - top2) / top1 < 0.02:  # Verifica se os topos/fundos estão próximos
-                    if data.iloc[-2] < top1 and data.iloc[-1] < top1:  # Double Top (Venda)
-                        alerts.append({
-                            "Ticker": ticker,
-                            "Setup": "Double Top",
-                            "Tipo": "Venda",
-                            "Descrição": f"Dois topos próximos em {top1:.2f} com reversão.",
-                            "Data": data.index[-1].strftime("%Y-%m-%d")
-                        })
-                    elif data.iloc[-2] > top1 and data.iloc[-1] > top1:  # Double Bottom (Compra)
-                        alerts.append({
-                            "Ticker": ticker,
-                            "Setup": "Double Bottom",
-                            "Tipo": "Compra",
-                            "Descrição": f"Dois fundos próximos em {top1:.2f} com reversão.",
-                            "Data": data.index[-1].strftime("%Y-%m-%d")
-                        })
-
-            # 4. Candle de Reversão
-            if len(data) >= 2:
-                prev_close = data.iloc[-2]
-                curr_close = data.iloc[-1]
-                if prev_close > data.iloc[-3] and curr_close < prev_close:  # Candle de baixa após alta (Venda)
-                    alerts.append({
-                        "Ticker": ticker,
-                        "Setup": "Candle de Reversão (Baixa)",
-                        "Tipo": "Venda",
-                        "Descrição": f"Candle de baixa após alta, indicando possível reversão.",
-                        "Data": data.index[-1].strftime("%Y-%m-%d")
-                    })
-                elif prev_close < data.iloc[-3] and curr_close > prev_close:  # Candle de alta após baixa (Compra)
-                    alerts.append({
-                        "Ticker": ticker,
-                        "Setup": "Candle de Reversão (Alta)",
-                        "Tipo": "Compra",
-                        "Descrição": f"Candle de alta após baixa, indicando possível reversão.",
-                        "Data": data.index[-1].strftime("%Y-%m-%d")
-                    })
+            # Verifica os setups
+            if current_close > current_mme and previous_close <= previous_mme:  # Setup 9.1 (Compra)
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "9.1 (Compra)",
+                    "Descrição": f"Preço fechou acima da MME de 9 períodos.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d"),
+                    "Preço": current_close,
+                    "MME": current_mme
+                })
+            elif current_close > current_mme and previous_close < previous_mme:  # Setup 9.2 (Compra)
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "9.2 (Compra)",
+                    "Descrição": f"Preço fechou acima da MME de 9 períodos após estar abaixo.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d"),
+                    "Preço": current_close,
+                    "MME": current_mme
+                })
+            elif current_close < current_mme and previous_close >= previous_mme:  # Setup 9.3 (Venda)
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "9.3 (Venda)",
+                    "Descrição": f"Preço fechou abaixo da MME de 9 períodos.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d"),
+                    "Preço": current_close,
+                    "MME": current_mme
+                })
+            elif current_close < current_mme and previous_close > previous_mme:  # Setup 9.4 (Venda)
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "9.4 (Venda)",
+                    "Descrição": f"Preço fechou abaixo da MME de 9 períodos após estar acima.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d"),
+                    "Preço": current_close,
+                    "MME": current_mme
+                })
 
     # Exibe os alertas
     if alerts:
         st.write("### Alertas de Setups Gráficos")
         for alert in alerts:
             with st.container():
-                st.write(f"**{alert['Ticker']}** - {alert['Setup']} ({alert['Tipo']})")
+                st.write(f"**{alert['Ticker']}** - {alert['Setup']}")
                 st.write(f"**Descrição**: {alert['Descrição']}")
                 st.write(f"**Data**: {alert['Data']}")
+                st.write(f"**Preço**: {alert['Preço']:.2f}")
+                st.write(f"**MME (9)**: {alert['MME']:.2f}")
                 st.write("---")
+
+                # Adiciona um gráfico interativo
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=data.index, y=data, mode='lines', name='Preço'))
+                fig.add_trace(go.Scatter(x=mme_9.index, y=mme_9, mode='lines', name='MME (9)'))
+                fig.update_layout(
+                    title=f"{alert['Ticker']} - Preço vs MME (9)",
+                    xaxis_title="Data",
+                    yaxis_title="Preço",
+                    template="plotly_dark"
+                )
+                st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nenhum setup gráfico detectado nos tickers.")
 
