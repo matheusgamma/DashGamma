@@ -19,6 +19,7 @@ def build_sidebar():
     ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  # Certifique-se de que o CSV está na pasta "tickers"
 
     # Seleciona os tickers
+
     tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
     tickers = [t + ".SA" for t in tickers]
     start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
