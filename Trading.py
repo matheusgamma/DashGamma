@@ -459,104 +459,117 @@ def screening_alerts():
 
     # Carrega a lista de tickers do arquivo
     try:
-        ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
-        ticker_list.index = ticker_list.index.astype(str)  # Garante que os tickers sejam strings
-        tickers = [t + ".SA" for t in ticker_list.index]
+        # Lê o arquivo CSV ignorando a coluna numérica
+        ticker_list = pd.read_csv("tickers/tickers_ibra.csv", header=None)
+        tickers = [t + ".SA" for t in ticker_list[1]]  # Usa a segunda coluna (tickers)
     except Exception as e:
         st.error(f"Erro ao carregar a lista de tickers: {e}")
         return
 
-    
-    # Baixa os dados de preços para todos os tickers
-    try:
-        prices = yf.download(tickers, period="6mo")  # Últimos 6 meses de dados
-        if prices.empty:
-            st.error("Não foi possível obter dados para os tickers.")
-            return
+    # Baixa os dados de preços para todos os tickers (em lotes para evitar timeout)
+    prices = pd.DataFrame()
+    batch_size = 10  # Número de tickers por lote
+    num_batches = (len(tickers) // batch_size) + 1
 
-        # Usa "Adj Close" se disponível, caso contrário, usa "Close"
-        prices = prices["Adj Close"] if "Adj Close" in prices else prices["Close"]
-        prices.columns = prices.columns.str.rstrip(".SA")  # Remove o sufixo ".SA"
-    except Exception as e:
-        st.error(f"Erro ao baixar os dados de preços: {e}")
+    with st.spinner("Baixando dados de preços..."):
+        for i in range(num_batches):
+            batch = tickers[i * batch_size : (i + 1) * batch_size]
+            if not batch:
+                continue
+            try:
+                batch_data = yf.download(batch, period="6mo", progress=False)  # Baixa os dados do lote
+                if "Adj Close" in batch_data:
+                    batch_prices = batch_data["Adj Close"]
+                else:
+                    batch_prices = batch_data["Close"]
+                prices = pd.concat([prices, batch_prices], axis=1)
+            except Exception as e:
+                st.warning(f"Erro ao baixar dados para o lote {i + 1}: {e}")
+
+    if prices.empty:
+        st.error("Não foi possível obter dados para os tickers.")
         return
+
+    # Remove o sufixo ".SA" dos nomes das colunas
+    prices.columns = prices.columns.str.rstrip(".SA")
 
     # Dicionário para armazenar os alertas
     alerts = []
 
     # Loop através de cada ticker
-    for ticker in prices.columns:
-        data = prices[ticker].dropna()
+    with st.spinner("Analisando setups gráficos..."):
+        for ticker in prices.columns:
+            data = prices[ticker].dropna()
 
-        if len(data) < 20:  # Verifica se há dados suficientes
-            continue
+            if len(data) < 20:  # Verifica se há dados suficientes
+                continue
 
-        # 1. Trap do Urso/Compra (Bear Trap)
-        if len(data) >= 3:
-            resistance = data[-3:].max()  # Resistência recente
-            if data.iloc[-1] > resistance and data.iloc[-2] < resistance:
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "Trap do Urso/Compra",
-                    "Tipo": "Compra",
-                    "Descrição": f"Preço rompeu a resistência {resistance:.2f} e reverteu.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d")
-                })
-
-        # 2. Spring (Falso rompimento de suporte)
-        if len(data) >= 3:
-            support = data[-3:].min()  # Suporte recente
-            if data.iloc[-1] < support and data.iloc[-2] > support:
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "Spring",
-                    "Tipo": "Compra",
-                    "Descrição": f"Preço rompeu o suporte {support:.2f} e reverteu.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d")
-                })
-
-        # 3. Double Top/Double Bottom
-        if len(data) >= 5:
-            top1 = data.iloc[-3]  # Primeiro topo/fundo
-            top2 = data.iloc[-1]  # Segundo topo/fundo
-            if abs(top1 - top2) / top1 < 0.02:  # Verifica se os topos/fundos estão próximos
-                if data.iloc[-2] < top1 and data.iloc[-1] < top1:  # Double Top (Venda)
+            # 1. Trap do Urso/Compra (Bear Trap)
+            if len(data) >= 3:
+                resistance = data[-3:].max()  # Resistência recente
+                if data.iloc[-1] > resistance and data.iloc[-2] < resistance:
                     alerts.append({
                         "Ticker": ticker,
-                        "Setup": "Double Top",
-                        "Tipo": "Venda",
-                        "Descrição": f"Dois topos próximos em {top1:.2f} com reversão.",
-                        "Data": data.index[-1].strftime("%Y-%m-%d")
-                    })
-                elif data.iloc[-2] > top1 and data.iloc[-1] > top1:  # Double Bottom (Compra)
-                    alerts.append({
-                        "Ticker": ticker,
-                        "Setup": "Double Bottom",
+                        "Setup": "Trap do Urso/Compra",
                         "Tipo": "Compra",
-                        "Descrição": f"Dois fundos próximos em {top1:.2f} com reversão.",
+                        "Descrição": f"Preço rompeu a resistência {resistance:.2f} e reverteu.",
                         "Data": data.index[-1].strftime("%Y-%m-%d")
                     })
 
-        # 4. Candle de Reversão
-        if len(data) >= 2:
-            prev_close = data.iloc[-2]
-            curr_close = data.iloc[-1]
-            if prev_close > data.iloc[-3] and curr_close < prev_close:  # Candle de baixa após alta (Venda)
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "Candle de Reversão (Baixa)",
-                    "Tipo": "Venda",
-                    "Descrição": f"Candle de baixa após alta, indicando possível reversão.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d")
-                })
-            elif prev_close < data.iloc[-3] and curr_close > prev_close:  # Candle de alta após baixa (Compra)
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "Candle de Reversão (Alta)",
-                    "Tipo": "Compra",
-                    "Descrição": f"Candle de alta após baixa, indicando possível reversão.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d")
-                })
+            # 2. Spring (Falso rompimento de suporte)
+            if len(data) >= 3:
+                support = data[-3:].min()  # Suporte recente
+                if data.iloc[-1] < support and data.iloc[-2] > support:
+                    alerts.append({
+                        "Ticker": ticker,
+                        "Setup": "Spring",
+                        "Tipo": "Compra",
+                        "Descrição": f"Preço rompeu o suporte {support:.2f} e reverteu.",
+                        "Data": data.index[-1].strftime("%Y-%m-%d")
+                    })
+
+            # 3. Double Top/Double Bottom
+            if len(data) >= 5:
+                top1 = data.iloc[-3]  # Primeiro topo/fundo
+                top2 = data.iloc[-1]  # Segundo topo/fundo
+                if abs(top1 - top2) / top1 < 0.02:  # Verifica se os topos/fundos estão próximos
+                    if data.iloc[-2] < top1 and data.iloc[-1] < top1:  # Double Top (Venda)
+                        alerts.append({
+                            "Ticker": ticker,
+                            "Setup": "Double Top",
+                            "Tipo": "Venda",
+                            "Descrição": f"Dois topos próximos em {top1:.2f} com reversão.",
+                            "Data": data.index[-1].strftime("%Y-%m-%d")
+                        })
+                    elif data.iloc[-2] > top1 and data.iloc[-1] > top1:  # Double Bottom (Compra)
+                        alerts.append({
+                            "Ticker": ticker,
+                            "Setup": "Double Bottom",
+                            "Tipo": "Compra",
+                            "Descrição": f"Dois fundos próximos em {top1:.2f} com reversão.",
+                            "Data": data.index[-1].strftime("%Y-%m-%d")
+                        })
+
+            # 4. Candle de Reversão
+            if len(data) >= 2:
+                prev_close = data.iloc[-2]
+                curr_close = data.iloc[-1]
+                if prev_close > data.iloc[-3] and curr_close < prev_close:  # Candle de baixa após alta (Venda)
+                    alerts.append({
+                        "Ticker": ticker,
+                        "Setup": "Candle de Reversão (Baixa)",
+                        "Tipo": "Venda",
+                        "Descrição": f"Candle de baixa após alta, indicando possível reversão.",
+                        "Data": data.index[-1].strftime("%Y-%m-%d")
+                    })
+                elif prev_close < data.iloc[-3] and curr_close > prev_close:  # Candle de alta após baixa (Compra)
+                    alerts.append({
+                        "Ticker": ticker,
+                        "Setup": "Candle de Reversão (Alta)",
+                        "Tipo": "Compra",
+                        "Descrição": f"Candle de alta após baixa, indicando possível reversão.",
+                        "Data": data.index[-1].strftime("%Y-%m-%d")
+                    })
 
     # Exibe os alertas
     if alerts:
