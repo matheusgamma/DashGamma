@@ -451,14 +451,134 @@ def cointegracao(tickers, prices):
         st.plotly_chart(fig, use_container_width=True)
 
 
+def screening_alerts():
+    """
+    Verifica setups gráficos para todos os tickers do arquivo e exibe alertas.
+    """
+    st.subheader("Screening Alerts - Setups Gráficos")
+
+    # Carrega a lista de tickers do arquivo
+    try:
+        ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
+        tickers = [t + ".SA" for t in ticker_list.index]
+    except Exception as e:
+        st.error(f"Erro ao carregar a lista de tickers: {e}")
+        return
+
+    # Baixa os dados de preços para todos os tickers
+    try:
+        prices = yf.download(tickers, period="6mo")  # Últimos 6 meses de dados
+        if prices.empty:
+            st.error("Não foi possível obter dados para os tickers.")
+            return
+
+        # Usa "Adj Close" se disponível, caso contrário, usa "Close"
+        prices = prices["Adj Close"] if "Adj Close" in prices else prices["Close"]
+        prices.columns = prices.columns.str.rstrip(".SA")  # Remove o sufixo ".SA"
+    except Exception as e:
+        st.error(f"Erro ao baixar os dados de preços: {e}")
+        return
+
+    # Dicionário para armazenar os alertas
+    alerts = []
+
+    # Loop através de cada ticker
+    for ticker in prices.columns:
+        data = prices[ticker].dropna()
+
+        if len(data) < 20:  # Verifica se há dados suficientes
+            continue
+
+        # 1. Trap do Urso/Compra (Bear Trap)
+        if len(data) >= 3:
+            resistance = data[-3:].max()  # Resistência recente
+            if data.iloc[-1] > resistance and data.iloc[-2] < resistance:
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "Trap do Urso/Compra",
+                    "Tipo": "Compra",
+                    "Descrição": f"Preço rompeu a resistência {resistance:.2f} e reverteu.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d")
+                })
+
+        # 2. Spring (Falso rompimento de suporte)
+        if len(data) >= 3:
+            support = data[-3:].min()  # Suporte recente
+            if data.iloc[-1] < support and data.iloc[-2] > support:
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "Spring",
+                    "Tipo": "Compra",
+                    "Descrição": f"Preço rompeu o suporte {support:.2f} e reverteu.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d")
+                })
+
+        # 3. Double Top/Double Bottom
+        if len(data) >= 5:
+            top1 = data.iloc[-3]  # Primeiro topo/fundo
+            top2 = data.iloc[-1]  # Segundo topo/fundo
+            if abs(top1 - top2) / top1 < 0.02:  # Verifica se os topos/fundos estão próximos
+                if data.iloc[-2] < top1 and data.iloc[-1] < top1:  # Double Top (Venda)
+                    alerts.append({
+                        "Ticker": ticker,
+                        "Setup": "Double Top",
+                        "Tipo": "Venda",
+                        "Descrição": f"Dois topos próximos em {top1:.2f} com reversão.",
+                        "Data": data.index[-1].strftime("%Y-%m-%d")
+                    })
+                elif data.iloc[-2] > top1 and data.iloc[-1] > top1:  # Double Bottom (Compra)
+                    alerts.append({
+                        "Ticker": ticker,
+                        "Setup": "Double Bottom",
+                        "Tipo": "Compra",
+                        "Descrição": f"Dois fundos próximos em {top1:.2f} com reversão.",
+                        "Data": data.index[-1].strftime("%Y-%m-%d")
+                    })
+
+        # 4. Candle de Reversão
+        if len(data) >= 2:
+            prev_close = data.iloc[-2]
+            curr_close = data.iloc[-1]
+            if prev_close > data.iloc[-3] and curr_close < prev_close:  # Candle de baixa após alta (Venda)
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "Candle de Reversão (Baixa)",
+                    "Tipo": "Venda",
+                    "Descrição": f"Candle de baixa após alta, indicando possível reversão.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d")
+                })
+            elif prev_close < data.iloc[-3] and curr_close > prev_close:  # Candle de alta após baixa (Compra)
+                alerts.append({
+                    "Ticker": ticker,
+                    "Setup": "Candle de Reversão (Alta)",
+                    "Tipo": "Compra",
+                    "Descrição": f"Candle de alta após baixa, indicando possível reversão.",
+                    "Data": data.index[-1].strftime("%Y-%m-%d")
+                })
+
+    # Exibe os alertas
+    if alerts:
+        st.write("### Alertas de Setups Gráficos")
+        for alert in alerts:
+            with st.container():
+                st.write(f"**{alert['Ticker']}** - {alert['Setup']} ({alert['Tipo']})")
+                st.write(f"**Descrição**: {alert['Descrição']}")
+                st.write(f"**Data**: {alert['Data']}")
+                st.write("---")
+    else:
+        st.info("Nenhum setup gráfico detectado nos tickers.")
+
+
 # Configuração inicial
 st.set_page_config(layout="wide")
 with st.sidebar:
     tickers, prices = build_sidebar()
-    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos","RRG","Cointegração - L&S","Screening Alerts"])
+    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos", "RRG", "Cointegração - L&S", "Screening Alerts"])
 
 st.title('Gamma Capital - Mercado de Capitais')
-if tickers and prices is not None:
+if selected_tab == "Screening Alerts":
+    screening_alerts()  # Chama a função independente da seleção de tickers
+elif tickers and prices is not None:
     if selected_tab == "Dashboard":
         main_dashboard(tickers, prices)
     elif selected_tab == "Correlação":
@@ -466,7 +586,7 @@ if tickers and prices is not None:
     elif selected_tab == "Múltiplos":
         multiples_dashboard(tickers)
     elif selected_tab == "Cointegração - L&S":
-        multiples_dashboard(tickers)
+        cointegracao(tickers, prices)
     elif selected_tab == "RRG":
         rrg_graph(tickers, prices)
 
