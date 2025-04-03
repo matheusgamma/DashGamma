@@ -390,66 +390,114 @@ def rrg_graph(tickers, prices):
 
 
 
-def cointegracao(tickers, prices):
-    st.subheader("Cointegração - Long & Short")
-    weights = np.ones(len(tickers)) / len(tickers)
-    prices['portfolio'] = prices.drop("IBOV", axis=1) @ weights
-    norm_prices = 100 * prices / prices.iloc[0]
-    returns = prices.pct_change()[1:]
-    vols = returns.std() * np.sqrt(252)
-    rets = (norm_prices.iloc[-1] - 100) / 100
-
-    market_returns = returns["IBOV"]
-    betas = {
-        t: calculate_beta(returns[t], market_returns) for t in prices.columns if t != "IBOV"
+def get_ibovespa_composition():
+    """Obtém a composição atual do Ibovespa com pesos"""
+    # Fonte: https://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/ibovespa-composicao-da-carteira.htm
+    # Você pode atualizar esta lista periodicamente ou criar um web scraper para pegar automaticamente
+    composition = {
+        "VALE3": {"peso": 10.5, "setor": "Materiais Básicos"},
+        "PETR4": {"peso": 8.2, "setor": "Petróleo e Gás"},
+        "ITUB4": {"peso": 7.8, "setor": "Financeiro"},
+        "BBDC4": {"peso": 5.3, "setor": "Financeiro"},
+        "PETR3": {"peso": 5.1, "setor": "Petróleo e Gás"},
+        "B3SA3": {"peso": 4.9, "setor": "Financeiro"},
+        "ABEV3": {"peso": 3.7, "setor": "Consumo"},
+        "BBAS3": {"peso": 3.5, "setor": "Financeiro"},
+        "WEGE3": {"peso": 3.2, "setor": "Industrial"},
+        "RENT3": {"peso": 2.9, "setor": "Consumo"},
+        # Adicione todos os outros ativos do Ibovespa aqui
     }
+    return composition
 
-    mygrid = grid(3, 3, 3, 3, 3, 3, vertical_align="top")
-    for t in prices.columns:
-        c = mygrid.container(border=True)
-        c.subheader(t, divider="red")
+def get_real_time_prices(tickers):
+    """Obtém os preços em tempo real dos ativos"""
+    tickers_list = [t + ".SA" for t in tickers]
+    data = yf.download(tickers_list, period="1d", progress=False)
+    if "Adj Close" in data:
+        prices = data["Adj Close"].iloc[-1]
+    else:
+        prices = data["Close"].iloc[-1]
+    return prices
 
-        colA, colB, colC, colD = c.columns([4, 6, 6, 6])
-        if t == "portfolio":
-            colA.image("images\pie-chart-dollar-svgrepo-com.svg",
-                       use_container_width=True)
-        elif t == "IBOV":
-            colA.image("\images\pie-chart-svgrepo-com.svg",
-                       use_container_width=True)
+def ibovespa_map():
+    """Mostra o mapa do Ibovespa com retornos por peso"""
+    st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
+    
+    with st.spinner("Obtendo dados atualizados do Ibovespa..."):
+        # Obtém composição e preços
+        composition = get_ibovespa_composition()
+        tickers = list(composition.keys())
+        prices = get_real_time_prices(tickers)
+        
+        # Calcula variação diária
+        previous_prices = yf.download([t + ".SA" for t in tickers], period="2d", progress=False)
+        if "Adj Close" in previous_prices:
+            previous_prices = previous_prices["Adj Close"]
         else:
-            colA.image(f'https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/{t}.png', width=85,
-                       use_container_width=True)
-
-        colB.metric(label="Retorno", value=f"{rets[t]:.0%}")
-        colC.metric(label="Volatilidade", value=f"{vols[t]:.0%}")
-        colD.metric(label="Beta", value=f"{betas[t]:.2f}" if t in betas else "N/A")
-
-        style_metric_cards(background_color='rgba(255,255,255,0)')
-    col1, col2 = st.columns(2, gap='large')
-    with col1:
-        st.subheader("Desempenho Relativo")
-        st.line_chart(norm_prices, height=600)
-
-    with col2:
-        st.subheader("Risco-Retorno")
-        fig = px.scatter(
-            x=vols,
-            y=rets,
-            text=vols.index,
-            color=rets / vols,
-            color_continuous_scale="Blues",
-            labels={"x": "Volatilidade", "y": "Retorno"},
-            template="plotly_dark",
-            title="Relação Risco-Retorno"
+            previous_prices = previous_prices["Close"]
+        
+        # Prepara dados para o gráfico
+        data = []
+        for ticker in tickers:
+            current_price = prices[ticker + ".SA"]
+            previous_price = previous_prices[ticker + ".SA"].iloc[-2]
+            variation = ((current_price - previous_price) / previous_price) * 100
+            
+            data.append({
+                "Ticker": ticker,
+                "Setor": composition[ticker]["setor"],
+                "Peso": composition[ticker]["peso"],
+                "Preço": current_price,
+                "Variação": variation,
+                "Patrimônio": composition[ticker]["peso"] * 1e6  # Valor fictício para tamanho
+            })
+        
+        df = pd.DataFrame(data)
+        
+        # Cria o treemap
+        fig = px.treemap(
+            df,
+            path=['Setor', 'Ticker'],
+            values='Peso',
+            color='Variação',
+            color_continuous_scale='RdYlGn',  # Vermelho-Yellow-Green
+            color_continuous_midpoint=0,
+            hover_data=['Preço', 'Variação'],
+            title='Composição do Ibovespa por Setor e Peso'
         )
-        fig.update_traces(
-            textfont_color='black',
-            marker=dict(size=42, line=dict(width=1, color="DarkSlateGrey")),
-            textfont_size=12,
+        
+        # Ajusta o layout
+        fig.update_layout(
+            margin=dict(t=50, l=25, r=25, b=25),
+            height=700,
+            coloraxis_colorbar=dict(
+                title="Variação (%)",
+                tickprefix="%"
+            )
         )
-        fig.layout.height = 600
-        fig.layout.coloraxis.colorbar.title = 'Sharpe'
+        
+        # Mostra o gráfico
         st.plotly_chart(fig, use_container_width=True)
+        
+        # Tabela com dados detalhados
+        st.subheader("📊 Dados Detalhados")
+        df_display = df.copy()
+        df_display['Variação'] = df_display['Variação'].apply(lambda x: f"{x:.2f}%")
+        df_display['Preço'] = df_display['Preço'].apply(lambda x: f"R$ {x:.2f}")
+        df_display['Peso'] = df_display['Peso'].apply(lambda x: f"{x:.2f}%")
+        
+        st.dataframe(
+            df_display[['Ticker', 'Setor', 'Peso', 'Preço', 'Variação']],
+            column_config={
+                "Ticker": "Ativo",
+                "Setor": "Setor",
+                "Peso": "Peso no IBOV",
+                "Preço": "Preço Atual",
+                "Variação": "Var. Dia (%)"
+            },
+            hide_index=True,
+            use_container_width=True
+        )
 
 
 def screening_alerts():
@@ -584,7 +632,7 @@ def screening_alerts():
 st.set_page_config(layout="wide")
 with st.sidebar:
     tickers, prices = build_sidebar()
-    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos", "RRG", "Cointegração - L&S", "Screening Alerts"])
+    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos", "RRG", "Mapa Ibovespa, "Screening Alerts"])
 
 st.title('Gamma Capital - Mercado de Capitais')
 if selected_tab == "Screening Alerts":
@@ -596,8 +644,8 @@ elif tickers and prices is not None:
         correlation_dashboard(prices)
     elif selected_tab == "Múltiplos":
         multiples_dashboard(tickers)
-    elif selected_tab == "Cointegração - L&S":
-        cointegracao(tickers, prices)
+    elif selected_tab == "Mapa Ibovespa":
+        ibovespa_map()
     elif selected_tab == "RRG":
         rrg_graph(tickers, prices)
 
