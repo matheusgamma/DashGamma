@@ -688,40 +688,41 @@ with st.sidebar:
     else:
         tickers, prices = None, None
 
-# Título principal
+# Configuração inicial
+st.set_page_config(layout="wide")
+
+with st.sidebar:
+    # Primeiro o seletor de tickers (como estava antes)
+    tickers, prices = build_sidebar()
+    
+    # Depois a seleção de abas (como você preferia)
+    selected_tab = st.radio(
+        "Escolha a visualização", 
+        ["Dashboard", "Correlação", "Múltiplos", "RRG", 
+         "Cointegração - L&S", "Screening Alerts", "Mapa Ibovespa"]
+    )
+
 st.title('Gamma Capital - Mercado de Capitais')
 
 # Lógica para exibir a aba correta
 if selected_tab == "Mapa Ibovespa":
-    ibovespa_map()
+    ibovespa_map()  # Funciona independente dos tickers selecionados
+    
 elif selected_tab == "Dashboard":
-    if tickers and prices is not None:
-        main_dashboard(tickers, prices)
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+    main_dashboard(tickers, prices)
+    
 elif selected_tab == "Correlação":
-    if tickers and prices is not None:
-        correlation_dashboard(prices)
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+    correlation_dashboard(prices)
+    
 elif selected_tab == "Múltiplos":
-    if tickers and prices is not None:
-        multiples_dashboard(tickers)
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+    multiples_dashboard(tickers)
+    
 elif selected_tab == "RRG":
-    if tickers and prices is not None:
-        rrg_graph(tickers, prices)
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+    rrg_graph(tickers, prices)
+    
 elif selected_tab == "Cointegração - L&S":
-    if tickers and prices is not None:
-        cointegracao(tickers, prices)
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+    cointegracao(tickers, prices)
+    
 elif selected_tab == "Screening Alerts":
-    if tickers and prices is not None:
-        screening_alerts()
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+    screening_alerts()
 
