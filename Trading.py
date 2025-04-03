@@ -632,7 +632,7 @@ def screening_alerts():
 st.set_page_config(layout="wide")
 with st.sidebar:
     tickers, prices = build_sidebar()
-    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos", "RRG", "Mapa Ibovespa, "Screening Alerts"])
+    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos", "RRG", "Mapa Ibovespa", "Screening Alerts"])
 
 st.title('Gamma Capital - Mercado de Capitais')
 if selected_tab == "Screening Alerts":
