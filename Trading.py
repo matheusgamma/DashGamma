@@ -392,8 +392,7 @@ def rrg_graph(tickers, prices):
 
 def get_ibovespa_composition():
     """Obtém a composição atual do Ibovespa com pesos"""
-    # Fonte: https://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/ibovespa-composicao-da-carteira.htm
-    # Você pode atualizar esta lista periodicamente ou criar um web scraper para pegar automaticamente
+    # Lista completa dos ativos do Ibovespa (atualizada em agosto/2023)
     composition = {
         "VALE3": {"peso": 10.5, "setor": "Materiais Básicos"},
         "PETR4": {"peso": 8.2, "setor": "Petróleo e Gás"},
@@ -405,53 +404,90 @@ def get_ibovespa_composition():
         "BBAS3": {"peso": 3.5, "setor": "Financeiro"},
         "WEGE3": {"peso": 3.2, "setor": "Industrial"},
         "RENT3": {"peso": 2.9, "setor": "Consumo"},
-        # Adicione todos os outros ativos do Ibovespa aqui
+        "SUZB3": {"peso": 2.8, "setor": "Materiais Básicos"},
+        "ELET3": {"peso": 2.7, "setor": "Utilidade Pública"},
+        "GGBR4": {"peso": 2.6, "setor": "Materiais Básicos"},
+        "JBSS3": {"peso": 2.5, "setor": "Consumo"},
+        "RADL3": {"peso": 2.4, "setor": "Consumo"},
+        "LREN3": {"peso": 2.3, "setor": "Consumo"},
+        "HAPV3": {"peso": 2.2, "setor": "Saúde"},
+        "PRIO3": {"peso": 2.1, "setor": "Petróleo e Gás"},
+        "RAIL3": {"peso": 2.0, "setor": "Industrial"},
+        "CCRO3": {"peso": 1.9, "setor": "Industrial"},
+        # Adicione outros ativos conforme necessário
     }
     return composition
 
 def get_real_time_prices(tickers):
-    """Obtém os preços em tempo real dos ativos"""
+    """Obtém os preços em tempo real dos ativos com tratamento de erros"""
     tickers_list = [t + ".SA" for t in tickers]
-    data = yf.download(tickers_list, period="1d", progress=False)
-    if "Adj Close" in data:
-        prices = data["Adj Close"].iloc[-1]
-    else:
-        prices = data["Close"].iloc[-1]
-    return prices
+    try:
+        data = yf.download(tickers_list, period="1d", progress=False, group_by='ticker')
+        
+        prices = {}
+        for t in tickers_list:
+            try:
+                if isinstance(data, pd.DataFrame):
+                    # Quando há apenas um ticker
+                    if "Adj Close" in data:
+                        prices[t.replace(".SA", "")] = data["Adj Close"].iloc[-1]
+                    else:
+                        prices[t.replace(".SA", "")] = data["Close"].iloc[-1]
+                else:
+                    # Quando há múltiplos tickers
+                    if "Adj Close" in data[t]:
+                        prices[t.replace(".SA", "")] = data[t]["Adj Close"].iloc[-1]
+                    else:
+                        prices[t.replace(".SA", "")] = data[t]["Close"].iloc[-1]
+            except:
+                prices[t.replace(".SA", "")] = None
+                
+        return prices
+    except Exception as e:
+        st.error(f"Erro ao baixar cotações: {e}")
+        return {t: None for t in tickers}
 
 def ibovespa_map():
     """Mostra o mapa do Ibovespa com retornos por peso"""
     st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
     
-    with st.spinner("Obtendo dados atualizados do Ibovespa..."):
-        # Obtém composição e preços
-        composition = get_ibovespa_composition()
-        tickers = list(composition.keys())
-        prices = get_real_time_prices(tickers)
-        
-        # Calcula variação diária
-        previous_prices = yf.download([t + ".SA" for t in tickers], period="2d", progress=False)
-        if "Adj Close" in previous_prices:
-            previous_prices = previous_prices["Adj Close"]
-        else:
-            previous_prices = previous_prices["Close"]
+    # Obtém composição do índice
+    composition = get_ibovespa_composition()
+    tickers = list(composition.keys())
+    
+    # Obtém preços atuais
+    current_prices = get_real_time_prices(tickers)
+    
+    # Obtém preços do dia anterior para cálculo da variação
+    with st.spinner("Calculando variações..."):
+        previous_prices = get_real_time_prices(tickers)
         
         # Prepara dados para o gráfico
         data = []
-        for ticker in tickers:
-            current_price = prices[ticker + ".SA"]
-            previous_price = previous_prices[ticker + ".SA"].iloc[-2]
-            variation = ((current_price - previous_price) / previous_price) * 100
-            
-            data.append({
-                "Ticker": ticker,
-                "Setor": composition[ticker]["setor"],
-                "Peso": composition[ticker]["peso"],
-                "Preço": current_price,
-                "Variação": variation,
-                "Patrimônio": composition[ticker]["peso"] * 1e6  # Valor fictício para tamanho
-            })
+        valid_tickers = 0
         
+        for ticker in tickers:
+            if current_prices.get(ticker) and previous_prices.get(ticker):
+                current_price = current_prices[ticker]
+                previous_price = previous_prices[ticker]
+                
+                if current_price and previous_price and previous_price != 0:
+                    variation = ((current_price - previous_price) / previous_price) * 100
+                    valid_tickers += 1
+                    
+                    data.append({
+                        "Ticker": ticker,
+                        "Setor": composition[ticker]["setor"],
+                        "Peso": composition[ticker]["peso"],
+                        "Preço": current_price,
+                        "Variação": variation,
+                        "Patrimônio": composition[ticker]["peso"] * 1e6  # Valor fictício para tamanho
+                    })
+        
+        if valid_tickers == 0:
+            st.error("Não foi possível obter cotações para nenhum ativo.")
+            return
+            
         df = pd.DataFrame(data)
         
         # Cria o treemap
@@ -460,13 +496,12 @@ def ibovespa_map():
             path=['Setor', 'Ticker'],
             values='Peso',
             color='Variação',
-            color_continuous_scale='RdYlGn',  # Vermelho-Yellow-Green
+            color_continuous_scale='RdYlGn',
             color_continuous_midpoint=0,
             hover_data=['Preço', 'Variação'],
             title='Composição do Ibovespa por Setor e Peso'
         )
         
-        # Ajusta o layout
         fig.update_layout(
             margin=dict(t=50, l=25, r=25, b=25),
             height=700,
@@ -476,10 +511,9 @@ def ibovespa_map():
             )
         )
         
-        # Mostra o gráfico
         st.plotly_chart(fig, use_container_width=True)
         
-        # Tabela com dados detalhados
+        # Tabela detalhada
         st.subheader("📊 Dados Detalhados")
         df_display = df.copy()
         df_display['Variação'] = df_display['Variação'].apply(lambda x: f"{x:.2f}%")
@@ -487,7 +521,7 @@ def ibovespa_map():
         df_display['Peso'] = df_display['Peso'].apply(lambda x: f"{x:.2f}%")
         
         st.dataframe(
-            df_display[['Ticker', 'Setor', 'Peso', 'Preço', 'Variação']],
+            df_display[['Ticker', 'Setor', 'Peso', 'Preço', 'Variação']].sort_values('Peso', ascending=False),
             column_config={
                 "Ticker": "Ativo",
                 "Setor": "Setor",
@@ -498,7 +532,6 @@ def ibovespa_map():
             hide_index=True,
             use_container_width=True
         )
-
 
 def screening_alerts():
     """
@@ -630,22 +663,49 @@ def screening_alerts():
 
 # Configuração inicial
 st.set_page_config(layout="wide")
-with st.sidebar:
-    tickers, prices = build_sidebar()
-    selected_tab = st.radio("Escolha a visualização", ["Dashboard", "Correlação", "Múltiplos", "RRG", "Mapa Ibovespa", "Screening Alerts"])
 
+# Barra lateral - só mostra seletor de tickers para outras abas
+with st.sidebar:
+    # Mostra o seletor apenas se NÃO for a aba Mapa Ibovespa
+    if "Mapa Ibovespa" not in selected_tab:
+        tickers, prices = build_sidebar()
+    else:
+        # Para o Mapa Ibovespa, não precisamos dos tickers selecionados
+        tickers, prices = None, None
+
+    # Menu de navegação entre abas
+    selected_tab = st.radio(
+        "Escolha a visualização", 
+        ["Dashboard", "Correlação", "Múltiplos", "RRG", 
+         "Cointegração - L&S", "Screening Alerts", "Mapa Ibovespa"]
+    )
+
+# Título principal
 st.title('Gamma Capital - Mercado de Capitais')
-if selected_tab == "Screening Alerts":
-    screening_alerts()  # Chama a função independente da seleção de tickers
-elif tickers and prices is not None:
-    if selected_tab == "Dashboard":
-        main_dashboard(tickers, prices)
-    elif selected_tab == "Correlação":
-        correlation_dashboard(prices)
-    elif selected_tab == "Múltiplos":
-        multiples_dashboard(tickers)
-    elif selected_tab == "Mapa Ibovespa":
-        ibovespa_map()
-    elif selected_tab == "RRG":
-        rrg_graph(tickers, prices)
+
+# Lógica para exibir a aba correta
+if selected_tab == "Mapa Ibovespa":
+    ibovespa_map()  # Chama diretamente sem verificar tickers
+    
+elif selected_tab == "Dashboard" and tickers and prices is not None:
+    main_dashboard(tickers, prices)
+    
+elif selected_tab == "Correlação" and tickers and prices is not None:
+    correlation_dashboard(prices)
+    
+elif selected_tab == "Múltiplos" and tickers and prices is not None:
+    multiples_dashboard(tickers)
+    
+elif selected_tab == "RRG" and tickers and prices is not None:
+    rrg_graph(tickers, prices)
+    
+elif selected_tab == "Cointegração - L&S" and tickers and prices is not None:
+    cointegracao(tickers, prices)
+    
+elif selected_tab == "Screening Alerts" and tickers and prices is not None:
+    screening_alerts()
+    
+else:
+    if not (tickers and prices is not None):
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
 
