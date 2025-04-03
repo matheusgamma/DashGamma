@@ -451,87 +451,97 @@ def ibovespa_map():
     """Mostra o mapa do Ibovespa com retornos por peso"""
     st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
     
-    # Obtém composição do índice
-    composition = get_ibovespa_composition()
-    tickers = list(composition.keys())
-    
-    # Obtém preços atuais
-    current_prices = get_real_time_prices(tickers)
-    
-    # Obtém preços do dia anterior para cálculo da variação
-    with st.spinner("Calculando variações..."):
-        previous_prices = get_real_time_prices(tickers)
+    try:
+        # Obtém composição do índice
+        composition = get_ibovespa_composition()
+        tickers = list(composition.keys())
         
-        # Prepara dados para o gráfico
-        data = []
-        valid_tickers = 0
-        
-        for ticker in tickers:
-            if current_prices.get(ticker) and previous_prices.get(ticker):
-                current_price = current_prices[ticker]
-                previous_price = previous_prices[ticker]
-                
-                if current_price and previous_price and previous_price != 0:
-                    variation = ((current_price - previous_price) / previous_price) * 100
-                    valid_tickers += 1
+        # Baixa os preços com tratamento robusto
+        with st.spinner("Obtendo cotações em tempo real..."):
+            # Tenta obter dados dos últimos 2 dias para calcular variação
+            data = yf.download(
+                [t + ".SA" for t in tickers],
+                period="2d",
+                group_by="ticker",
+                progress=False
+            )
+            
+            if data.empty:
+                st.error("Não foi possível conectar ao serviço de cotações.")
+                return
+            
+            # Processa os dados
+            results = []
+            for ticker in tickers:
+                try:
+                    # Verifica se temos dados para este ticker
+                    if ticker + ".SA" not in data:
+                        continue
+                        
+                    # Obtém preços de fechamento
+                    closes = data[ticker + ".SA"]["Close"] if isinstance(data, pd.DataFrame) else data[ticker + ".SA"].Close
                     
-                    data.append({
+                    if len(closes) < 2:
+                        continue
+                        
+                    current_price = closes.iloc[-1]
+                    previous_price = closes.iloc[-2]
+                    
+                    # Calcula variação
+                    variation = ((current_price - previous_price) / previous_price) * 100 if previous_price != 0 else 0
+                    
+                    results.append({
                         "Ticker": ticker,
                         "Setor": composition[ticker]["setor"],
                         "Peso": composition[ticker]["peso"],
                         "Preço": current_price,
-                        "Variação": variation,
-                        "Patrimônio": composition[ticker]["peso"] * 1e6  # Valor fictício para tamanho
+                        "Variação": variation
                     })
-        
-        if valid_tickers == 0:
-            st.error("Não foi possível obter cotações para nenhum ativo.")
-            return
+                
+                except Exception as e:
+                    continue
             
-        df = pd.DataFrame(data)
-        
-        # Cria o treemap
-        fig = px.treemap(
-            df,
-            path=['Setor', 'Ticker'],
-            values='Peso',
-            color='Variação',
-            color_continuous_scale='RdYlGn',
-            color_continuous_midpoint=0,
-            hover_data=['Preço', 'Variação'],
-            title='Composição do Ibovespa por Setor e Peso'
-        )
-        
-        fig.update_layout(
-            margin=dict(t=50, l=25, r=25, b=25),
-            height=700,
-            coloraxis_colorbar=dict(
-                title="Variação (%)",
-                tickprefix="%"
+            if not results:
+                st.error("Não foi possível obter cotações válidas para os ativos.")
+                return
+                
+            df = pd.DataFrame(results)
+            
+            # Cria o treemap
+            fig = px.treemap(
+                df,
+                path=['Setor', 'Ticker'],
+                values='Peso',
+                color='Variação',
+                color_continuous_scale='RdYlGn',
+                color_continuous_midpoint=0,
+                hover_data=['Preço', 'Variação'],
+                title='Composição do Ibovespa por Setor e Peso'
             )
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Tabela detalhada
-        st.subheader("📊 Dados Detalhados")
-        df_display = df.copy()
-        df_display['Variação'] = df_display['Variação'].apply(lambda x: f"{x:.2f}%")
-        df_display['Preço'] = df_display['Preço'].apply(lambda x: f"R$ {x:.2f}")
-        df_display['Peso'] = df_display['Peso'].apply(lambda x: f"{x:.2f}%")
-        
-        st.dataframe(
-            df_display[['Ticker', 'Setor', 'Peso', 'Preço', 'Variação']].sort_values('Peso', ascending=False),
-            column_config={
-                "Ticker": "Ativo",
-                "Setor": "Setor",
-                "Peso": "Peso no IBOV",
-                "Preço": "Preço Atual",
-                "Variação": "Var. Dia (%)"
-            },
-            hide_index=True,
-            use_container_width=True
-        )
+            
+            fig.update_layout(
+                margin=dict(t=50, l=25, r=25, b=25),
+                height=700
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Mostra tabela com os dados
+            st.dataframe(
+                df.sort_values('Peso', ascending=False),
+                column_config={
+                    "Ticker": "Ativo",
+                    "Setor": "Setor", 
+                    "Peso": st.column_config.NumberColumn("Peso (%)", format="%.2f %%"),
+                    "Preço": st.column_config.NumberColumn("Preço (R$)", format="R$ %.2f"),
+                    "Variação": st.column_config.NumberColumn("Variação (%)", format="%.2f %%")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+    except Exception as e:
+        st.error(f"Erro ao gerar o mapa: {str(e)}")
 
 def screening_alerts():
     """
