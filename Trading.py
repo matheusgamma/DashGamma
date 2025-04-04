@@ -485,7 +485,6 @@ def ibovespa_map():
                             
                             plot_data.append({
                                 "Ticker": ticker,
-                                "Setor": composition[ticker]["setor"],
                                 "Peso": composition[ticker]["peso"],
                                 "Preço": current_price,
                                 "Variação": variation,
