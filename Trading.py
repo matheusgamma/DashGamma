@@ -448,58 +448,61 @@ def get_real_time_prices(tickers):
         return {t: None for t in tickers}
 
 def ibovespa_map():
-    """Mapa do Ibovespa definitivo - sem bugs e com visual profissional"""
+    """Mapa do Ibovespa com variação diária e formatação aprimorada"""
     st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
     
     try:
-        # 1. Obter composição atualizada
-        composition = {
-            "VALE3": {"peso": 8.53, "setor": "Minerais"},
-            "PETR4": {"peso": 7.89, "setor": "Petróleo"},
-            "ITUB4": {"peso": 6.72, "setor": "Financeiro"},
-            # [...] (lista completa atualizada)
-        }
+        composition = get_ibovespa_composition()
+        tickers = [t + ".SA" for t in composition.keys()]
         
-        # 2. Download eficiente dos dados
-        with st.spinner("🔄 Conectando aos dados de mercado..."):
-            tickers = [t + ".SA" for t in composition.keys()]
-            data = yf.download(tickers, period="2d", group_by="ticker", progress=False, timeout=10)
+        with st.spinner("Obtendo dados em tempo real..."):
+            # Baixa dados dos últimos 2 dias para calcular variação
+            data = yf.download(tickers, period="2d", group_by="ticker", progress=False)
             
             if data.empty:
-                st.error("⏳ Serviço indisponível no momento. Tente novamente em 5 minutos.")
+                st.error("Dados não disponíveis no momento. Tente novamente mais tarde.")
                 return
-
-        # 3. Processamento à prova de erros
-        plot_data = []
-        valid_tickers = []
-        
-        for ticker in composition.keys():
-            try:
-                ticker_data = data[ticker + ".SA"]["Close"] if isinstance(data, dict) else data[ticker + ".SA"].Close
-                
-                if len(ticker_data) >= 2:
-                    current = ticker_data.iloc[-1]
-                    previous = ticker_data.iloc[-2]
-                    variation = ((current - previous) / previous) * 100
-                    
-                    plot_data.append({
-                        "Ticker": ticker,
-                        "Setor": composition[ticker]["setor"],
-                        "Peso": composition[ticker]["peso"],
-                        "Preço": current,
-                        "Variação": variation,
-                        "Label": f"<b>{ticker}</b><br>R$ {current:.2f}<br>{'▲' if variation >=0 else '▼'} {abs(variation):.2f}%<br><small>Peso: {composition[ticker]['peso']:.2f}%</small>"
-                    })
-                    valid_tickers.append(ticker)
-            except:
-                continue
-
-        # 4. Verificação de qualidade
-        if len(valid_tickers) < 0.7 * len(composition):
-            st.warning(f"Atenção: Dados incompletos (apenas {len(valid_tickers)} de {len(composition)} ativos)")
-
-        # 5. Visualização otimizada
-        if plot_data:
+            
+            plot_data = []
+            for ticker in composition.keys():
+                ticker_key = ticker + ".SA"
+                try:
+                    if ticker_key in data:
+                        close_data = data[ticker_key]["Close"] if isinstance(data, dict) else data[ticker_key].Close
+                        
+                        if len(close_data) >= 2 and not pd.isna(close_data.iloc[-1]):
+                            current_price = close_data.iloc[-1]
+                            previous_price = close_data.iloc[-2]
+                            variation = ((current_price - previous_price) / previous_price) * 100
+                            
+                            # Formatação dos valores
+                            formatted_price = f"R$ {current_price:.2f}"
+                            formatted_weight = f"{composition[ticker]['peso']:.2f}%"
+                            formatted_variation = f"{variation:+.2f}%"
+                            
+                            # Cor baseada na variação
+                            color = "green" if variation >= 0 else "red"
+                            
+                            plot_data.append({
+                                "Ticker": ticker,
+                                "Setor": composition[ticker]["setor"],
+                                "Peso": composition[ticker]["peso"],
+                                "Preço": current_price,
+                                "Variação": variation,
+                                "Texto": (
+                                    f"<b style='font-size:16px; text-align:center'>{ticker}</b><br>"
+                                    f"<span style='font-size:14px'>{formatted_price}</span><br>"
+                                    f"<span style='font-size:12px; color:{color}'>{formatted_variation}</span><br>"
+                                    f"<span style='font-size:10px'>{formatted_weight}</span>"
+                                )
+                            })
+                except Exception as e:
+                    continue
+            
+            if not plot_data:
+                st.error("Não foi possível obter cotações válidas.")
+                return
+            
             df = pd.DataFrame(plot_data)
             
             fig = px.treemap(
@@ -507,43 +510,43 @@ def ibovespa_map():
                 path=['Setor', 'Ticker'],
                 values='Peso',
                 color='Variação',
-                color_continuous_scale=[[0, 'red'], [0.5, 'lightyellow'], [1, 'green']],
+                color_continuous_scale='RdYlGn',
                 color_continuous_midpoint=0,
-                hover_data={'Label': False},
-                branchvalues='total'
+                hover_name='Texto',
+                hover_data={'Texto': False},
+                width=1000,
+                height=700
             )
             
-            # Configuração visual imbatível
+            # Ajustes estéticos finais
             fig.update_traces(
-                texttemplate='%{customdata[0]}',
-                textfont=dict(family="Arial", size=16, color="black"),
-                textposition="middle center",
-                marker=dict(
-                    line=dict(width=0.8, color='#444'),
-                    pad=dict(top=10, bottom=10, left=10, right=10)
+                texttemplate='<b>%{label}</b><br>%{customdata[0]}',
+                textfont=dict(
+                    family="Arial Black",
+                    color="black",
+                    size=14
                 ),
-                hovertemplate='%{hovertext}<extra></extra>',
-                hoverlabel=dict(bgcolor="white", font_size=14)
+                textposition="middle center",
+                marker=dict(line=dict(width=1, color='DarkSlateGrey'))
             )
             
             fig.update_layout(
-                margin=dict(t=30, l=10, r=10, b=10),
-                uniformtext=dict(minsize=12, mode='hide'),
+                margin=dict(t=50, l=25, r=25, b=25),
+                uniformtext=dict(
+                    minsize=12,
+                    mode='hide'
+                ),
                 coloraxis_colorbar=dict(
-                    title="Variação %",
-                    tickprefix=" ",
-                    thickness=12,
-                    len=0.5
+                    title="Variação (%)",
+                    tickprefix="%",
+                    thickness=15
                 )
             )
             
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig, use_container_width=True)
             
-        else:
-            st.error("❌ Dados insuficientes para gerar o mapa")
-
     except Exception as e:
-        st.error(f"⚠️ Erro crítico: {str(e)}")
+        st.error(f"Erro ao gerar o mapa: {str(e)}")
         
 def screening_alerts():
     """
