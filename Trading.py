@@ -448,19 +448,19 @@ def get_real_time_prices(tickers):
         return {t: None for t in tickers}
 
 def ibovespa_map():
-    """Mapa do Ibovespa com interação suave e tratamento robusto"""
+    """Mapa do Ibovespa com tratamento robusto de erros e visual otimizado"""
     st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
     
     try:
         composition = get_ibovespa_composition()
         tickers = [t + ".SA" for t in composition.keys()]
         
-        with st.spinner("Atualizando dados em tempo real..."):
+        with st.spinner("Atualizando dados do mercado..."):
             # Baixa dados dos últimos 2 pregões
             data = yf.download(tickers, period="2d", group_by="ticker", progress=False)
             
             if data.empty:
-                st.warning("Os dados do mercado estão temporariamente indisponíveis. Tente novamente em alguns minutos.")
+                st.warning("Os dados do mercado estão temporariamente indisponíveis.")
                 return
             
             plot_data = []
@@ -498,15 +498,15 @@ def ibovespa_map():
                     missing_tickers.append(ticker)
             
             if missing_tickers:
-                st.warning(f"Dados incompletos para {len(missing_tickers)} ativos (ex: {', '.join(missing_tickers[:3])}{'...' if len(missing_tickers) > 3 else ''})")
+                st.warning(f"Dados incompletos para {len(missing_tickers)} ativos")
             
             if not plot_data:
-                st.error("Não foi possível obter dados suficientes para gerar o mapa.")
+                st.error("Não há dados suficientes para gerar o mapa.")
                 return
             
             df = pd.DataFrame(plot_data)
             
-            # Configuração do gráfico com animação
+            # Configuração do gráfico
             fig = px.treemap(
                 df,
                 path=['Setor', 'Ticker'],
@@ -515,12 +515,12 @@ def ibovespa_map():
                 color_continuous_scale='RdYlGn',
                 color_continuous_midpoint=0,
                 hover_name='Texto',
-                hover_data={'Texto': False, 'Setor': False, 'Ticker': False},
+                hover_data={'Texto': False},
                 width=1000,
                 height=700
             )
             
-            # Ajustes visuais e de interação
+            # Ajustes visuais
             fig.update_traces(
                 texttemplate='%{customdata[0]}',
                 textfont=dict(
@@ -531,14 +531,12 @@ def ibovespa_map():
                 textposition="middle center",
                 marker=dict(
                     line=dict(width=1, color='rgba(0,0,0,0.2)'),
-                    opacity=0.95
                 ),
                 hovertemplate='%{hovertext}<extra></extra>'
             )
             
             fig.update_layout(
                 margin=dict(t=40, l=20, r=20, b=20),
-                transition={'duration': 300},
                 uniformtext=dict(
                     minsize=10,
                     mode='hide'
@@ -547,20 +545,14 @@ def ibovespa_map():
                     title="Variação %",
                     tickprefix="+",
                     thickness=15
-                )
+                ),
+                transition={'duration': 300}
             )
             
-            # Adiciona interatividade suave
-            fig.update_layout(
-                clickmode='event+select',
-                hovermode='closest'
-            )
-            
-            # Exibe o gráfico
             st.plotly_chart(fig, use_container_width=True)
             
     except Exception as e:
-        st.error(f"Erro inesperado: {str(e)}")
+        st.error(f"Erro ao processar dados: {str(e)}")
         
 def screening_alerts():
     """
