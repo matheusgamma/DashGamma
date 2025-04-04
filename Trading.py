@@ -448,96 +448,90 @@ def get_real_time_prices(tickers):
         return {t: None for t in tickers}
 
 def ibovespa_map():
-    """Mapa do Ibovespa com visualização aprimorada"""
+    """Mapa do Ibovespa com formatação aprimorada"""
     st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
     
     try:
-        # Obtém composição do índice
         composition = get_ibovespa_composition()
         tickers = [t + ".SA" for t in composition.keys()]
         
-        # Baixa os dados de forma robusta
         with st.spinner("Obtendo dados em tempo real..."):
-            try:
-                data = yf.download(tickers, period="2d", group_by="ticker", progress=False)
-                
-                if data.empty:
-                    st.error("Não foi possível obter dados dos ativos. Tente novamente mais tarde.")
-                    return
-                
-                # Processa os dados
-                plot_data = []
-                for ticker in composition.keys():
-                    ticker_key = ticker + ".SA"
-                    try:
-                        if ticker_key in data:
-                            closes = data[ticker_key]["Close"] if isinstance(data, dict) else data[ticker_key].Close
-                            
-                            if len(closes) >= 2:
-                                current_price = closes.iloc[-1]
-                                previous_price = closes.iloc[-2]
-                                variation = ((current_price - previous_price) / previous_price) * 100
-                                
-                                plot_data.append({
-                                    "Ticker": ticker,
-                                    "Setor": composition[ticker]["setor"],
-                                    "Peso": composition[ticker]["peso"],
-                                    "Preço": current_price,
-                                    "Variação": variation,
-                                    "Texto": f"<b>{ticker}</b><br>R$ {current_price:.2f}<br>{variation:+.2f}%<br>Peso: {composition[ticker]['peso']}%"
-                                })
-                    except Exception as e:
-                        st.warning(f"Erro ao processar {ticker}: {str(e)}")
-                        continue
-                
-                if not plot_data:
-                    st.error("Não foi possível obter cotações válidas para os ativos.")
-                    return
-                
-                df = pd.DataFrame(plot_data)
-                
-                # Cria o treemap
-                fig = px.treemap(
-                    df,
-                    path=['Setor', 'Ticker'],
-                    values='Peso',
-                    color='Variação',
-                    color_continuous_scale='RdYlGn',
-                    color_continuous_midpoint=0,
-                    hover_name='Texto',
-                    hover_data={'Texto': False},
-                    width=1000,
-                    height=700
-                )
-                
-                # Ajustes estéticos
-                fig.update_traces(
-                    texttemplate='%{label}<br>R$ %{customdata[0]:.2f}<br>%{customdata[1]:+.2f}%',
-                    textfont=dict(
-                        size=18,
-                        family="Arial Black",
-                        color="black"
-                    ),
-                    textposition="middle center",
-                    marker=dict(line=dict(width=2, color='DarkSlateGrey'))
-                )
-                
-                fig.update_layout(
-                    margin=dict(t=50, l=25, r=25, b=25),
-                    coloraxis_colorbar=dict(
-                        title="Variação (%)",
-                        tickprefix="%"
-                    )
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-            except Exception as e:
-                st.error(f"Erro ao baixar cotações: {str(e)}")
+            data = yf.download(tickers, period="1d", group_by="ticker", progress=False)
+            
+            if data.empty:
+                st.error("Dados não disponíveis no momento. Tente novamente mais tarde.")
                 return
-                
+            
+            plot_data = []
+            for ticker in composition.keys():
+                ticker_key = ticker + ".SA"
+                try:
+                    if ticker_key in data:
+                        # Verifica se temos dados de Close válidos
+                        close_data = data[ticker_key]["Close"] if isinstance(data, dict) else data[ticker_key].Close
+                        
+                        if not pd.isna(close_data.iloc[-1]):
+                            current_price = close_data.iloc[-1]
+                            variation = 0  # Default para quando não há dado anterior
+                            
+                            # Formatação dos valores
+                            formatted_price = f"R$ {current_price:.2f}" if not pd.isna(current_price) else "N/A"
+                            formatted_weight = f"{composition[ticker]['peso']:.2f}%"  # 2 casas decimais
+                            
+                            plot_data.append({
+                                "Ticker": ticker,
+                                "Setor": composition[ticker]["setor"],
+                                "Peso": composition[ticker]["peso"],
+                                "Preço": current_price,
+                                "Texto": (
+                                    f"<b>{ticker}</b><br>"
+                                    f"<span style='font-size:14px'>{formatted_price}</span><br>"
+                                    f"<span style='font-size:12px'>{formatted_weight}</span>"
+                                )
+                            })
+                except Exception as e:
+                    continue
+            
+            if not plot_data:
+                st.error("Não foi possível obter cotações válidas.")
+                return
+            
+            df = pd.DataFrame(plot_data)
+            
+            fig = px.treemap(
+                df,
+                path=['Setor', 'Ticker'],
+                values='Peso',
+                color='Preço',
+                hover_name='Texto',
+                hover_data={'Texto': False},
+                width=1000,
+                height=700
+            )
+            
+            # Ajustes estéticos finais
+            fig.update_traces(
+                texttemplate='%{customdata[0]}',
+                textfont=dict(
+                    family="Arial Black",
+                    color="black"
+                ),
+                marker=dict(line=dict(width=1, color='DarkSlateGrey'))
+            )
+            
+            fig.update_layout(
+                margin=dict(t=50, l=25, r=25, b=25),
+                uniformtext=dict(
+                    minsize=10,
+                    mode='hide'
+                )
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
     except Exception as e:
-        st.error(f"Erro inesperado: {str(e)}")
+        st.error(f"Erro ao gerar o mapa: {str(e)}")
+        
 def screening_alerts():
     """
     Verifica setups gráficos (9.1, 9.2, 9.3, 9.4) para todos os tickers do arquivo e exibe alertas.
