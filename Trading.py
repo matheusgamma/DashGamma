@@ -448,7 +448,7 @@ def get_real_time_prices(tickers):
         return {t: None for t in tickers}
 
 def ibovespa_map():
-    """Mostra o mapa do Ibovespa com retornos por peso"""
+    """Mapa do Ibovespa com visualização profissional"""
     st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
     
     try:
@@ -456,90 +456,82 @@ def ibovespa_map():
         composition = get_ibovespa_composition()
         tickers = list(composition.keys())
         
-        # Baixa os preços com tratamento robusto
-        with st.spinner("Obtendo cotações em tempo real..."):
-            # Tenta obter dados dos últimos 2 dias para calcular variação
-            data = yf.download(
-                [t + ".SA" for t in tickers],
-                period="2d",
-                group_by="ticker",
-                progress=False
-            )
+        # Baixa os dados
+        data = yf.download(tickers, period="2d", progress=False)
+        
+        if data.empty:
+            st.error("Não foi possível conectar ao serviço de cotações.")
+            return
             
-            if data.empty:
-                st.error("Não foi possível conectar ao serviço de cotações.")
-                return
-            
-            # Processa os dados
-            results = []
-            for ticker in tickers:
-                try:
-                    # Verifica se temos dados para este ticker
-                    if ticker + ".SA" not in data:
-                        continue
-                        
-                    # Obtém preços de fechamento
-                    closes = data[ticker + ".SA"]["Close"] if isinstance(data, pd.DataFrame) else data[ticker + ".SA"].Close
-                    
-                    if len(closes) < 2:
-                        continue
-                        
+        # Processa os dados
+        plot_data = []
+        for ticker in tickers:
+            try:
+                closes = data[ticker + ".SA"]["Close"] if isinstance(data, pd.DataFrame) else data[ticker + ".SA"].Close
+                
+                if len(closes) >= 2:
                     current_price = closes.iloc[-1]
                     previous_price = closes.iloc[-2]
-                    
-                    # Calcula variação
                     variation = ((current_price - previous_price) / previous_price) * 100 if previous_price != 0 else 0
                     
-                    results.append({
+                    plot_data.append({
                         "Ticker": ticker,
                         "Setor": composition[ticker]["setor"],
                         "Peso": composition[ticker]["peso"],
                         "Preço": current_price,
-                        "Variação": variation
+                        "Variação": variation,
+                        "Texto": f"<b>{ticker}</b><br>R$ {current_price:.2f}<br>{variation:.2f}%<br>Peso: {composition[ticker]['peso']:.2f}%"
                     })
-                
-                except Exception as e:
-                    continue
+            except:
+                continue
+        
+        if not plot_data:
+            st.error("Não foi possível obter cotações válidas.")
+            return
             
-            if not results:
-                st.error("Não foi possível obter cotações válidas para os ativos.")
-                return
-                
-            df = pd.DataFrame(results)
-            
-            # Cria o treemap
-            fig = px.treemap(
-                df,
-                path=['Setor', 'Ticker'],
-                values='Peso',
-                color='Variação',
-                color_continuous_scale='RdYlGn',
-                color_continuous_midpoint=0,
-                hover_data=['Preço', 'Variação'],
-                title='Composição do Ibovespa por Setor e Peso'
+        df = pd.DataFrame(plot_data)
+        
+        # Cria o treemap aprimorado
+        fig = px.treemap(
+            df,
+            path=['Setor', 'Ticker'],
+            values='Peso',
+            color='Variação',
+            color_continuous_scale='RdYlGn',
+            color_continuous_midpoint=0,
+            hover_name='Texto',
+            hover_data={'Texto': False, 'Setor': False, 'Ticker': False, 'Peso': False},
+            title='Composição do Ibovespa',
+            width=1000,
+            height=700
+        )
+        
+        # Ajustes estéticos
+        fig.update_traces(
+            texttemplate='%{label}<br>%{customdata[0]}',
+            textfont=dict(
+                size=18,
+                family="Arial Black",
+                color="black"
+            ),
+            textposition="middle center",
+            marker=dict(line=dict(width=2, color='DarkSlateGrey')),
+            hovertemplate='%{hovertext}<extra></extra>'
+        )
+        
+        fig.update_layout(
+            margin=dict(t=50, l=25, r=25, b=25),
+            font=dict(size=14),
+            coloraxis_colorbar=dict(
+                title="Variação (%)",
+                tickprefix="%",
+                thickness=15,
+                len=0.75
             )
-            
-            fig.update_layout(
-                margin=dict(t=50, l=25, r=25, b=25),
-                height=700
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Mostra tabela com os dados
-            st.dataframe(
-                df.sort_values('Peso', ascending=False),
-                column_config={
-                    "Ticker": "Ativo",
-                    "Setor": "Setor", 
-                    "Peso": st.column_config.NumberColumn("Peso (%)", format="%.2f %%"),
-                    "Preço": st.column_config.NumberColumn("Preço (R$)", format="R$ %.2f"),
-                    "Variação": st.column_config.NumberColumn("Variação (%)", format="%.2f %%")
-                },
-                hide_index=True,
-                use_container_width=True
-            )
-            
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
     except Exception as e:
         st.error(f"Erro ao gerar o mapa: {str(e)}")
 
