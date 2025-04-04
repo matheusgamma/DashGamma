@@ -448,7 +448,7 @@ def get_real_time_prices(tickers):
         return {t: None for t in tickers}
 
 def ibovespa_map():
-    """Mapa do Ibovespa com formatação aprimorada"""
+    """Mapa do Ibovespa com variação diária e formatação aprimorada"""
     st.subheader("🗺️ Mapa do Ibovespa - Composição por Setor")
     
     try:
@@ -456,7 +456,8 @@ def ibovespa_map():
         tickers = [t + ".SA" for t in composition.keys()]
         
         with st.spinner("Obtendo dados em tempo real..."):
-            data = yf.download(tickers, period="1d", group_by="ticker", progress=False)
+            # Baixa dados dos últimos 2 dias para calcular variação
+            data = yf.download(tickers, period="2d", group_by="ticker", progress=False)
             
             if data.empty:
                 st.error("Dados não disponíveis no momento. Tente novamente mais tarde.")
@@ -467,26 +468,32 @@ def ibovespa_map():
                 ticker_key = ticker + ".SA"
                 try:
                     if ticker_key in data:
-                        # Verifica se temos dados de Close válidos
                         close_data = data[ticker_key]["Close"] if isinstance(data, dict) else data[ticker_key].Close
                         
-                        if not pd.isna(close_data.iloc[-1]):
+                        if len(close_data) >= 2 and not pd.isna(close_data.iloc[-1]):
                             current_price = close_data.iloc[-1]
-                            variation = 0  # Default para quando não há dado anterior
+                            previous_price = close_data.iloc[-2]
+                            variation = ((current_price - previous_price) / previous_price) * 100
                             
                             # Formatação dos valores
-                            formatted_price = f"R$ {current_price:.2f}" if not pd.isna(current_price) else "N/A"
-                            formatted_weight = f"{composition[ticker]['peso']:.2f}%"  # 2 casas decimais
+                            formatted_price = f"R$ {current_price:.2f}"
+                            formatted_weight = f"{composition[ticker]['peso']:.2f}%"
+                            formatted_variation = f"{variation:+.2f}%"
+                            
+                            # Cor baseada na variação
+                            color = "green" if variation >= 0 else "red"
                             
                             plot_data.append({
                                 "Ticker": ticker,
                                 "Setor": composition[ticker]["setor"],
                                 "Peso": composition[ticker]["peso"],
                                 "Preço": current_price,
+                                "Variação": variation,
                                 "Texto": (
-                                    f"<b>{ticker}</b><br>"
+                                    f"<b style='font-size:16px; text-align:center'>{ticker}</b><br>"
                                     f"<span style='font-size:14px'>{formatted_price}</span><br>"
-                                    f"<span style='font-size:12px'>{formatted_weight}</span>"
+                                    f"<span style='font-size:12px; color:{color}'>{formatted_variation}</span><br>"
+                                    f"<span style='font-size:10px'>{formatted_weight}</span>"
                                 )
                             })
                 except Exception as e:
@@ -502,7 +509,9 @@ def ibovespa_map():
                 df,
                 path=['Setor', 'Ticker'],
                 values='Peso',
-                color='Preço',
+                color='Variação',
+                color_continuous_scale='RdYlGn',
+                color_continuous_midpoint=0,
                 hover_name='Texto',
                 hover_data={'Texto': False},
                 width=1000,
@@ -511,19 +520,26 @@ def ibovespa_map():
             
             # Ajustes estéticos finais
             fig.update_traces(
-                texttemplate='%{customdata[0]}',
+                texttemplate='<b>%{label}</b><br>%{customdata[0]}',
                 textfont=dict(
                     family="Arial Black",
-                    color="black"
+                    color="black",
+                    size=14
                 ),
+                textposition="middle center",
                 marker=dict(line=dict(width=1, color='DarkSlateGrey'))
             )
             
             fig.update_layout(
                 margin=dict(t=50, l=25, r=25, b=25),
                 uniformtext=dict(
-                    minsize=10,
+                    minsize=12,
                     mode='hide'
+                ),
+                coloraxis_colorbar=dict(
+                    title="Variação (%)",
+                    tickprefix="%",
+                    thickness=15
                 )
             )
             
