@@ -692,37 +692,56 @@ with st.sidebar:
 st.set_page_config(layout="wide")
 
 with st.sidebar:
-    # Primeiro o seletor de tickers (como estava antes)
-    tickers, prices = build_sidebar()
+    # IMAGEM NO TOPO (como estava antes)
+    st.image("images/Gamma-XP.png")  
     
-    # Depois a seleção de abas (como você preferia)
+    # SELECTOR DE TICKERS (como estava antes)
+    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  
+    tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
+    tickers = [t + ".SA" for t in tickers]
+    start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
+    end_date = st.date_input("Até", value=datetime.now().date(), format="YYYY-MM-DD")
+    
+    # SELECTOR DE ABAS (NA PARTE INFERIOR, como você preferia)
     selected_tab = st.radio(
         "Escolha a visualização", 
         ["Dashboard", "Correlação", "Múltiplos", "RRG", 
          "Cointegração - L&S", "Screening Alerts", "Mapa Ibovespa"]
     )
 
+# Título principal
 st.title('Gamma Capital - Mercado de Capitais')
 
 # Lógica para exibir a aba correta
 if selected_tab == "Mapa Ibovespa":
-    ibovespa_map()  # Funciona independente dos tickers selecionados
-    
+    ibovespa_map()
 elif selected_tab == "Dashboard":
-    main_dashboard(tickers, prices)
-    
+    if tickers and prices is not None:
+        main_dashboard(tickers, prices)
+    else:
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
 elif selected_tab == "Correlação":
-    correlation_dashboard(prices)
-    
+    if tickers and prices is not None:
+        correlation_dashboard(prices)
+    else:
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
 elif selected_tab == "Múltiplos":
-    multiples_dashboard(tickers)
-    
+    if tickers and prices is not None:
+        multiples_dashboard(tickers)
+    else:
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
 elif selected_tab == "RRG":
-    rrg_graph(tickers, prices)
-    
+    if tickers and prices is not None:
+        rrg_graph(tickers, prices)
+    else:
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
 elif selected_tab == "Cointegração - L&S":
-    cointegracao(tickers, prices)
-    
+    if tickers and prices is not None:
+        cointegracao(tickers, prices)
+    else:
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
 elif selected_tab == "Screening Alerts":
-    screening_alerts()
-
+    if tickers and prices is not None:
+        screening_alerts()
+    else:
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
