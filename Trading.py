@@ -506,7 +506,7 @@ def ibovespa_map():
             
             fig = px.treemap(
                 df,
-                path=['Setor', 'Ticker'],
+                path=['Ticker'],
                 values='Peso',
                 color='Variação',
                 color_continuous_scale='RdYlGn',
