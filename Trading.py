@@ -688,27 +688,6 @@ with st.sidebar:
     else:
         tickers, prices = None, None
 
-# Configuração inicial
-st.set_page_config(layout="wide")
-
-with st.sidebar:
-    # IMAGEM NO TOPO (como estava antes)
-    st.image("images/Gamma-XP.png")  
-    
-    # SELECTOR DE TICKERS (como estava antes)
-    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  
-    tickers = st.multiselect(label="Selecione as Empresas", options=ticker_list, placeholder='Códigos')
-    tickers = [t + ".SA" for t in tickers]
-    start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
-    end_date = st.date_input("Até", value=datetime.now().date(), format="YYYY-MM-DD")
-    
-    # SELECTOR DE ABAS (NA PARTE INFERIOR, como você preferia)
-    selected_tab = st.radio(
-        "Escolha a visualização", 
-        ["Dashboard", "Correlação", "Múltiplos", "RRG", 
-         "Cointegração - L&S", "Screening Alerts", "Mapa Ibovespa"]
-    )
-
 # Título principal
 st.title('Gamma Capital - Mercado de Capitais')
 
