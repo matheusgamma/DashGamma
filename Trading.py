@@ -485,6 +485,7 @@ def ibovespa_map():
                             
                             plot_data.append({
                                 "Ticker": ticker,
+                                "Setor": composition[ticker]["setor"],
                                 "Peso": composition[ticker]["peso"],
                                 "Preço": current_price,
                                 "Variação": variation,
@@ -506,7 +507,7 @@ def ibovespa_map():
             
             fig = px.treemap(
                 df,
-                path=['Ticker'],
+                path=['Setor', 'Ticker'],
                 values='Peso',
                 color='Variação',
                 color_continuous_scale='RdYlGn',
