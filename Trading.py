@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 
 def build_sidebar():
     # Carrega a imagem do repositório (caminho relativo)
-    st.image("images/Logo_Renova_Verde_Escuro_RGB.png")  # Certifique-se de que a imagem está na pasta "images" do repositório
+    st.image("images/avatar-renova-instagram.png")  # Certifique-se de que a imagem está na pasta "images" do repositório
 
     # Carrega a lista de tickers do repositório (caminho relativo)
     ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)  # Certifique-se de que o CSV está na pasta "tickers"
