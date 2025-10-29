@@ -694,7 +694,7 @@ with st.sidebar:
         tickers, prices = None, None
 
 # Título principal
-st.title('Gamma Capital - Mercado de Capitais')
+st.title('Renova Invest - Mercado de Capitais')
 
 # Lógica para exibir a aba correta
 if selected_tab == "Mapa Ibovespa":
