@@ -548,133 +548,6 @@ def ibovespa_map():
     except Exception as e:
         st.error(f"Erro ao gerar o mapa: {str(e)}")
         
-def screening_alerts():
-    """
-    Verifica setups gráficos (9.1, 9.2, 9.3, 9.4) para todos os tickers do arquivo e exibe alertas.
-    """
-    st.subheader("Screening Alerts - Setups 9.1, 9.2, 9.3 e 9.4 (Timeframe Diário)")
-
-    # Carrega a lista de tickers do arquivo
-    try:
-        # Lê o arquivo CSV com um separador de vírgula e sem cabeçalho
-        ticker_list = pd.read_csv("tickers/tickers_ibra.csv", header=None, sep=",")
-        tickers = [t + ".SA" for t in ticker_list[1]]  # Usa a segunda coluna (tickers)
-    except Exception as e:
-        st.error(f"Erro ao carregar a lista de tickers: {e}")
-        return
-
-    # Baixa os dados de preços para todos os tickers (em lotes para evitar timeout)
-    prices = pd.DataFrame()
-    batch_size = 10  # Número de tickers por lote
-    num_batches = (len(tickers) // batch_size) + 1
-
-    with st.spinner("Baixando dados de preços..."):
-        for i in range(num_batches):
-            batch = tickers[i * batch_size : (i + 1) * batch_size]
-            if not batch:
-                continue
-            try:
-                # Baixa os dados diários
-                batch_data = yf.download(batch, period="6mo", interval="1d", progress=False)
-                if "Adj Close" in batch_data:
-                    batch_prices = batch_data["Adj Close"]
-                else:
-                    batch_prices = batch_data["Close"]
-                prices = pd.concat([prices, batch_prices], axis=1)
-            except Exception as e:
-                st.warning(f"Erro ao baixar dados para o lote {i + 1}: {e}")
-
-    if prices.empty:
-        st.error("Não foi possível obter dados para os tickers.")
-        return
-
-    # Remove o sufixo ".SA" dos nomes das colunas
-    prices.columns = prices.columns.str.rstrip(".SA")
-
-    # Dicionário para armazenar os alertas
-    alerts = []
-
-    # Loop através de cada ticker
-    with st.spinner("Analisando setups gráficos..."):
-        for ticker in prices.columns:
-            data = prices[ticker].dropna()
-
-            if len(data) < 20:  # Verifica se há dados suficientes
-                continue
-
-            # Calcula a MME de 9 períodos
-            mme_9 = data.rolling(window=9).mean()
-
-            # Preço atual e fechamento anterior
-            current_close = data.iloc[-1]
-            previous_close = data.iloc[-2]
-            current_mme = mme_9.iloc[-1]
-            previous_mme = mme_9.iloc[-2]
-
-            # Verifica os setups
-            if current_close > current_mme and previous_close <= previous_mme:  # Setup 9.1 (Compra)
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "9.1 (Compra)",
-                    "Descrição": f"Preço fechou acima da MME de 9 períodos.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d"),
-                    "Preço": current_close,
-                    "MME": current_mme
-                })
-            elif current_close > current_mme and previous_close < previous_mme:  # Setup 9.2 (Compra)
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "9.2 (Compra)",
-                    "Descrição": f"Preço fechou acima da MME de 9 períodos após estar abaixo.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d"),
-                    "Preço": current_close,
-                    "MME": current_mme
-                })
-            elif current_close < current_mme and previous_close >= previous_mme:  # Setup 9.3 (Venda)
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "9.3 (Venda)",
-                    "Descrição": f"Preço fechou abaixo da MME de 9 períodos.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d"),
-                    "Preço": current_close,
-                    "MME": current_mme
-                })
-            elif current_close < current_mme and previous_close > previous_mme:  # Setup 9.4 (Venda)
-                alerts.append({
-                    "Ticker": ticker,
-                    "Setup": "9.4 (Venda)",
-                    "Descrição": f"Preço fechou abaixo da MME de 9 períodos após estar acima.",
-                    "Data": data.index[-1].strftime("%Y-%m-%d"),
-                    "Preço": current_close,
-                    "MME": current_mme
-                })
-
-    # Exibe os alertas
-    if alerts:
-        st.write("### Alertas de Setups Gráficos")
-        for alert in alerts:
-            with st.container():
-                st.write(f"**{alert['Ticker']}** - {alert['Setup']}")
-                st.write(f"**Descrição**: {alert['Descrição']}")
-                st.write(f"**Data**: {alert['Data']}")
-                st.write(f"**Preço**: {alert['Preço']:.2f}")
-                st.write(f"**MME (9)**: {alert['MME']:.2f}")
-                st.write("---")
-
-                # Adiciona um gráfico interativo
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=data.index, y=data, mode='lines', name='Preço'))
-                fig.add_trace(go.Scatter(x=mme_9.index, y=mme_9, mode='lines', name='MME (9)'))
-                fig.update_layout(
-                    title=f"{alert['Ticker']} - Preço vs MME (9)",
-                    xaxis_title="Data",
-                    yaxis_title="Preço",
-                    template="plotly_dark"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Nenhum setup gráfico detectado nos tickers.")
-
 
 # Configuração inicial
 st.set_page_config(layout="wide")
@@ -683,8 +556,7 @@ st.set_page_config(layout="wide")
 with st.sidebar:
     selected_tab = st.radio(
         "Escolha a visualização", 
-        ["Dashboard", "Correlação", "Múltiplos", "RRG", 
-         "Cointegração - L&S", "Screening Alerts", "Mapa Ibovespa"]
+        ["Dashboard", "Correlação", "Múltiplos", "RRG", "Mapa Ibovespa"]
     )
     
     # Só mostra seletor de tickers para outras abas
@@ -717,15 +589,5 @@ elif selected_tab == "Múltiplos":
 elif selected_tab == "RRG":
     if tickers and prices is not None:
         rrg_graph(tickers, prices)
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
-elif selected_tab == "Cointegração - L&S":
-    if tickers and prices is not None:
-        cointegracao(tickers, prices)
-    else:
-        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
-elif selected_tab == "Screening Alerts":
-    if tickers and prices is not None:
-        screening_alerts()
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
