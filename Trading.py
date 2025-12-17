@@ -228,6 +228,67 @@ def multiples_dashboard(tickers):
     except Exception as e:
         st.error(f"Erro geral ao obter dados financeiros: {e}")
 
+def dividends_dashboard(tickers):
+    """
+    Mostra histórico de dividendos (por ação) em barras ano a ano
+    para os tickers selecionados.
+    """
+    st.subheader("📊 Histórico de Dividendos (ano a ano)")
+
+    if not tickers:
+        st.warning("Selecione pelo menos um ticker.")
+        return
+
+    # Parâmetro simples pra filtrar anos muito antigos
+    min_year = st.slider("Mostrar a partir do ano", 2000, datetime.now().year, 2015)
+
+    annual = {}
+    for t in tickers:
+        t_clean = t.replace(".SA", "")
+        try:
+            divs = yf.Ticker(t).dividends  # Série com datas e valores (cash dividend por ação)
+
+            if divs is None or len(divs) == 0:
+                annual[t_clean] = pd.Series(dtype=float)
+                continue
+
+            divs = divs.copy()
+            divs.index = pd.to_datetime(divs.index)
+            annual_sum = divs.resample("Y").sum()
+            annual_sum.index = annual_sum.index.year
+            annual_sum = annual_sum[annual_sum.index >= min_year]
+
+            annual[t_clean] = annual_sum
+
+        except Exception as e:
+            st.error(f"Erro ao obter dividendos de {t_clean}: {e}")
+            annual[t_clean] = pd.Series(dtype=float)
+
+    if not any(len(s) > 0 for s in annual.values()):
+        st.warning("Não encontrei histórico de dividendos para os ativos selecionados.")
+        return
+
+    # Junta num DataFrame: linhas = anos, colunas = tickers
+    df = pd.DataFrame(annual).fillna(0)
+    df.index.name = "Ano"
+
+    st.dataframe(df, use_container_width=True)
+
+    # Gráfico em barras (Plotly) - empilhado para ver soma e composição
+    df_plot = df.reset_index().melt(id_vars="Ano", var_name="Ticker", value_name="Dividendos")
+    fig = px.bar(
+        df_plot,
+        x="Ano",
+        y="Dividendos",
+        color="Ticker",
+        barmode="group",  # troque para "stack" se preferir empilhado
+        title="Dividendos por ação (soma no ano)",
+        template="plotly_dark",
+    )
+    fig.update_layout(height=600)
+    st.plotly_chart(fig, use_container_width=True)
+
+
 
 
 def rrg_graph(tickers, prices):
@@ -556,7 +617,7 @@ st.set_page_config(layout="wide")
 with st.sidebar:
     selected_tab = st.radio(
         "Escolha a visualização", 
-        ["Dashboard", "Correlação", "Múltiplos", "RRG", "Mapa Ibovespa"]
+        ["Dashboard", "Correlação", "Múltiplos","Dividendos", "RRG", "Mapa Ibovespa"]
     )
     
     # Só mostra seletor de tickers para outras abas
@@ -584,6 +645,11 @@ elif selected_tab == "Correlação":
 elif selected_tab == "Múltiplos":
     if tickers and prices is not None:
         multiples_dashboard(tickers)
+    else:
+        st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+elif selected_tab == "Dividendos":
+    if tickers and prices is not None:
+        dividends_dashboard(tickers)
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
 elif selected_tab == "RRG":
