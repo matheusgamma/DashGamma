@@ -160,39 +160,47 @@ def multiples_dashboard(tickers):
     try:
         # Coleta de dados financeiros
         ticker_data = yq.Ticker(tickers)
-        summary_data = ticker_data.summary_detail
-        key_stats_data = ticker_data.key_stats
+summary_data = ticker_data.summary_detail
+key_stats_data = ticker_data.key_stats
 
-        financial_data = []
-        for ticker in tickers:
-            ticker_clean = ticker.rstrip(".SA")
-            summary = summary_data.get(ticker, {})
-            key_stats = key_stats_data.get(ticker, {})
+financial_data = []
+for ticker in tickers:
+    ticker_clean = ticker.rstrip(".SA")
 
-            try:
-                # Coletando dados para o cálculo do ROE
-                net_income = key_stats.get("netIncomeToCommon", None)  # Lucro líquido
-                equity = key_stats.get("totalStockholderEquity", None) #NÃO EXISTE NO SUMMARY E NEM NO KEYSTATS
-                book_value_per_share = key_stats.get("bookValue") # VALUE PER SHARE
-                shares_outstanding = key_stats.get("sharesOutstanding")
-                total_equity = book_value_per_share * shares_outstanding
+    summary_raw = summary_data.get(ticker, {}) if isinstance(summary_data, dict) else {}
+    key_raw = key_stats_data.get(ticker, {}) if isinstance(key_stats_data, dict) else {}
 
-                roe = (
-                    f"{(net_income / total_equity) * 100:.2f}%" if net_income and total_equity else "Dado não disponível"
-                )
+    summary = ensure_dict(summary_raw)
+    key_stats = ensure_dict(key_raw)
 
-                financial_data.append({
-                    "Ticker": ticker_clean,
-                    "P/L": summary.get("trailingPE", "Indisponível"),
-                    "P/VP": key_stats.get("priceToBook", "Indisponível"),
-                    "LPA": key_stats.get("trailingEps", "Indisponível"),
-                    "Margem Bruta": f"{key_stats.get('profitMargins', 0) * 100:.2f}%" if key_stats.get('profitMargins') is not None else "Indisponível",
-                    "Margem EBITDA": f"{key_stats.get('enterpriseToEbitda', 0):.2f}" if key_stats.get('enterpriseToEbitda') is not None else "Indisponível",
-                    "ROE": roe,  # ROE CALCULADO MANUALMENTE
-                    "Dividend Yield": f"{summary.get('dividendYield', 0) * 100:.2f}%" if summary.get('dividendYield') is not None else "Indisponível",
-                })
-            except Exception as e:
-                st.error(f"Erro ao processar dados de {ticker_clean}: {e}")
+    # (opcional) se vier string, mostra no app pra você saber a causa
+    if isinstance(summary_raw, str) or isinstance(key_raw, str):
+        st.warning(f"{ticker_clean}: Yahoo retornou texto/erro temporário. Tentando seguir com o que tiver.")
+
+    try:
+        net_income = key_stats.get("netIncomeToCommon")
+        book_value_per_share = key_stats.get("bookValue")
+        shares_outstanding = key_stats.get("sharesOutstanding")
+
+        total_equity = None
+        if book_value_per_share and shares_outstanding:
+            total_equity = book_value_per_share * shares_outstanding
+
+        roe = f"{(net_income / total_equity) * 100:.2f}%" if net_income and total_equity else "Indisponível"
+
+        financial_data.append({
+            "Ticker": ticker_clean,
+            "P/L": summary.get("trailingPE", "Indisponível"),
+            "P/VP": key_stats.get("priceToBook", "Indisponível"),
+            "LPA": key_stats.get("trailingEps", "Indisponível"),
+            "Margem Bruta": f"{key_stats.get('profitMargins', 0) * 100:.2f}%" if key_stats.get('profitMargins') is not None else "Indisponível",
+            "Margem EBITDA": key_stats.get("enterpriseToEbitda", "Indisponível"),
+            "ROE": roe,
+            "Dividend Yield": f"{summary.get('dividendYield', 0) * 100:.2f}%" if summary.get('dividendYield') is not None else "Indisponível",
+        })
+    except Exception as e:
+        st.error(f"Erro ao processar dados de {ticker_clean}: {e}")
+
 
         # Exibição dos dados financeiros
         for company in financial_data:
