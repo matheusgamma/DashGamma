@@ -160,46 +160,46 @@ def multiples_dashboard(tickers):
     try:
         # Coleta de dados financeiros
         ticker_data = yq.Ticker(tickers)
-summary_data = ticker_data.summary_detail
-key_stats_data = ticker_data.key_stats
+        summary_data = ticker_data.summary_detail
+        key_stats_data = ticker_data.key_stats
 
-financial_data = []
-for ticker in tickers:
-    ticker_clean = ticker.rstrip(".SA")
+        financial_data = []
+    for ticker in tickers:
+        ticker_clean = ticker.rstrip(".SA")
 
-    summary_raw = summary_data.get(ticker, {}) if isinstance(summary_data, dict) else {}
-    key_raw = key_stats_data.get(ticker, {}) if isinstance(key_stats_data, dict) else {}
+        summary_raw = summary_data.get(ticker, {}) if isinstance(summary_data, dict) else {}
+        key_raw = key_stats_data.get(ticker, {}) if isinstance(key_stats_data, dict) else {}
 
-    summary = ensure_dict(summary_raw)
-    key_stats = ensure_dict(key_raw)
+        summary = ensure_dict(summary_raw)
+        key_stats = ensure_dict(key_raw)
 
     # (opcional) se vier string, mostra no app pra você saber a causa
     if isinstance(summary_raw, str) or isinstance(key_raw, str):
         st.warning(f"{ticker_clean}: Yahoo retornou texto/erro temporário. Tentando seguir com o que tiver.")
 
-    try:
-        net_income = key_stats.get("netIncomeToCommon")
-        book_value_per_share = key_stats.get("bookValue")
-        shares_outstanding = key_stats.get("sharesOutstanding")
+        try:
+            net_income = key_stats.get("netIncomeToCommon")
+            book_value_per_share = key_stats.get("bookValue")
+            shares_outstanding = key_stats.get("sharesOutstanding")
 
-        total_equity = None
-        if book_value_per_share and shares_outstanding:
-            total_equity = book_value_per_share * shares_outstanding
+            total_equity = None
+            if book_value_per_share and shares_outstanding:
+                total_equity = book_value_per_share * shares_outstanding
 
-        roe = f"{(net_income / total_equity) * 100:.2f}%" if net_income and total_equity else "Indisponível"
+            roe = f"{(net_income / total_equity) * 100:.2f}%" if net_income and total_equity else "Indisponível"
 
-        financial_data.append({
-            "Ticker": ticker_clean,
-            "P/L": summary.get("trailingPE", "Indisponível"),
-            "P/VP": key_stats.get("priceToBook", "Indisponível"),
-            "LPA": key_stats.get("trailingEps", "Indisponível"),
-            "Margem Bruta": f"{key_stats.get('profitMargins', 0) * 100:.2f}%" if key_stats.get('profitMargins') is not None else "Indisponível",
-            "Margem EBITDA": key_stats.get("enterpriseToEbitda", "Indisponível"),
-            "ROE": roe,
-            "Dividend Yield": f"{summary.get('dividendYield', 0) * 100:.2f}%" if summary.get('dividendYield') is not None else "Indisponível",
+            financial_data.append({
+                "Ticker": ticker_clean,
+                "P/L": summary.get("trailingPE", "Indisponível"),
+                "P/VP": key_stats.get("priceToBook", "Indisponível"),
+                "LPA": key_stats.get("trailingEps", "Indisponível"),
+                "Margem Bruta": f"{key_stats.get('profitMargins', 0) * 100:.2f}%" if key_stats.get('profitMargins') is not None else "Indisponível",
+                "Margem EBITDA": key_stats.get("enterpriseToEbitda", "Indisponível"),
+                "ROE": roe,
+                "Dividend Yield": f"{summary.get('dividendYield', 0) * 100:.2f}%" if summary.get('dividendYield') is not None else "Indisponível",
         })
-    except Exception as e:
-        st.error(f"Erro ao processar dados de {ticker_clean}: {e}")
+        except Exception as e:
+            st.error(f"Erro ao processar dados de {ticker_clean}: {e}")
 
 
         # Exibição dos dados financeiros
