@@ -740,12 +740,12 @@ st.set_page_config(layout="wide")
 # Primeiro definimos a seleção de abas
 with st.sidebar:
     selected_tab = st.radio(
-        "Escolha a visualização", 
-        ["Dashboard","Análise Técnica", "Correlação", "Múltiplos","Dividendos", "RRG", "Mapa Ibovespa"]
+        "Escolha a visualização",
+        ["Dashboard", "Correlação", "Múltiplos", "Dividendos",
+         "Análise Técnica", "Notícias", "RRG", "Mapa Ibovespa"]
     )
-    
-    # Só mostra seletor de tickers para outras abas
-    if selected_tab != "Mapa Ibovespa":
+
+    if selected_tab in ["Dashboard", "Correlação", "Múltiplos", "Dividendos", "RRG"]:
         tickers, prices = build_sidebar()
     else:
         tickers, prices = None, None
@@ -754,34 +754,43 @@ with st.sidebar:
 st.title('Renova Invest - Mercado de Capitais')
 
 # Lógica para exibir a aba correta
-if selected_tab in ["Dashboard", "Correlação", "Múltiplos", "Dividendos", "RRG"]:
-    tickers, prices = build_sidebar()
-else:
-    tickers, prices = None, None
+# Lógica para exibir a aba correta
+if selected_tab == "Mapa Ibovespa":
+    ibovespa_map()
+
 elif selected_tab == "Dashboard":
     if tickers and prices is not None:
         main_dashboard(tickers, prices)
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+
 elif selected_tab == "Correlação":
     if tickers and prices is not None:
         correlation_dashboard(prices)
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+
 elif selected_tab == "Múltiplos":
     if tickers and prices is not None:
         multiples_dashboard(tickers)
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+
 elif selected_tab == "Dividendos":
     if tickers and prices is not None:
         dividends_dashboard(tickers)
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+
+elif selected_tab == "Análise Técnica":
+    technical_analysis_dashboard()
+
+elif selected_tab == "Notícias":
+    news_terminal()
+
 elif selected_tab == "RRG":
     if tickers and prices is not None:
         rrg_graph(tickers, prices)
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
-elif selected_tab == "Análise Técnica":
-    technical_analysis_dashboard()
+
