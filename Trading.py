@@ -202,11 +202,22 @@ def technical_analysis_dashboard():
     st.plotly_chart(fig, use_container_width=True)
 
     # Extras rápidos (opcional): retorno no período e amplitude
-    ret = (df["Close"].iloc[-1] / df["Close"].iloc[0]) - 1
-    amp = (df["High"].max() / df["Low"].min()) - 1
+    # --- Métricas robustas (garante escalar float)
+try:
+    close_first = float(df["Close"].iloc[0])
+    close_last = float(df["Close"].iloc[-1])
+    high_max = float(df["High"].max())
+    low_min = float(df["Low"].min())
+
+    ret = (close_last / close_first) - 1
+    amp = (high_max / low_min) - 1
+
     c1, c2 = st.columns(2)
     c1.metric("Retorno no período", f"{ret:.2%}")
     c2.metric("Amplitude (High/Low)", f"{amp:.2%}")
+except Exception as e:
+    st.warning(f"Não foi possível calcular métricas do período: {e}")
+
 
 
 def correlation_dashboard(prices):
