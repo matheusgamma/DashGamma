@@ -133,7 +133,7 @@ def fetch_ohlc(ticker, period, interval):
 def technical_analysis_dashboard():
     st.subheader("📈 Análise Técnica (Candles)")
 
-    # Carrega lista local (mesmo arquivo que você usa)
+    # Lista de tickers (local)
     ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
     ticker = st.selectbox("Ticker (1 por vez)", options=ticker_list)
     ticker_yf = f"{ticker}.SA"
@@ -146,15 +146,24 @@ def technical_analysis_dashboard():
     with col3:
         show_volume = st.toggle("Mostrar volume", value=True)
 
-    interval = {"Diário": "1d", "Semanal": "1wk", "Mensal": "1mo"}[interval_label]
+    interval = {
+        "Diário": "1d",
+        "Semanal": "1wk",
+        "Mensal": "1mo"
+    }[interval_label]
 
+    # =========================
+    # DADOS
+    # =========================
     df = fetch_ohlc(ticker_yf, period=period, interval=interval)
 
-    if df.empty:
-        st.error("Não consegui baixar os dados desse ticker/período. Tente outro timeframe ou período.")
+    if df is None or df.empty:
+        st.error("Não foi possível carregar dados para este ativo/período.")
         return
 
-    # Candlestick (Plotly)
+    # =========================
+    # GRÁFICO DE CANDLES
+    # =========================
     fig = go.Figure()
 
     fig.add_trace(
@@ -168,17 +177,17 @@ def technical_analysis_dashboard():
         )
     )
 
-    # Volume opcional (como barras no eixo secundário)
     if show_volume and "Volume" in df.columns:
         fig.add_trace(
             go.Bar(
                 x=df.index,
                 y=df["Volume"],
                 name="Volume",
-                opacity=0.30,
+                opacity=0.25,
                 yaxis="y2"
             )
         )
+
         fig.update_layout(
             yaxis2=dict(
                 overlaying="y",
@@ -192,33 +201,30 @@ def technical_analysis_dashboard():
         template="plotly_dark",
         height=700,
         title=f"{ticker} • {interval_label} • {period}",
-        xaxis_title="Data",
-        yaxis_title="Preço",
         xaxis_rangeslider_visible=False,
-        legend=dict(orientation="h"),
         margin=dict(l=20, r=20, t=50, b=20)
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # Extras rápidos (opcional): retorno no período e amplitude
-    # --- Métricas robustas (garante escalar float)
-try:
-    close_first = float(df["Close"].iloc[0])
-    close_last = float(df["Close"].iloc[-1])
-    high_max = float(df["High"].max())
-    low_min = float(df["Low"].min())
+    # =========================
+    # MÉTRICAS (SEMPRE DENTRO DA FUNÇÃO)
+    # =========================
+    try:
+        close_first = float(df["Close"].iloc[0])
+        close_last = float(df["Close"].iloc[-1])
+        high_max = float(df["High"].max())
+        low_min = float(df["Low"].min())
 
-    ret = (close_last / close_first) - 1
-    amp = (high_max / low_min) - 1
+        ret = (close_last / close_first) - 1
+        amp = (high_max / low_min) - 1
 
-    c1, c2 = st.columns(2)
-    c1.metric("Retorno no período", f"{ret:.2%}")
-    c2.metric("Amplitude (High/Low)", f"{amp:.2%}")
-except Exception as e:
-    st.warning(f"Não foi possível calcular métricas do período: {e}")
+        c1, c2 = st.columns(2)
+        c1.metric("Retorno no período", f"{ret:.2%}")
+        c2.metric("Amplitude (High / Low)", f"{amp:.2%}")
 
-
+    except Exception as e:
+        st.warning(f"Não foi possível calcular métricas do período: {e}")
 
 def correlation_dashboard(prices):
     correlation_matrix = calculate_correlation(prices.drop(columns="IBOV"))
