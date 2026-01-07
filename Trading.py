@@ -10,6 +10,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import yahooquery as yq
 from bs4 import BeautifulSoup
+import plotly.graph_objects as go
+
 
 def build_sidebar():
     # Carrega a imagem do repositório (caminho relativo)
@@ -119,6 +121,93 @@ def main_dashboard(tickers, prices):
         fig.layout.height = 600
         fig.layout.coloraxis.colorbar.title = 'Sharpe'
         st.plotly_chart(fig, use_container_width=True)
+
+@st.cache_data(ttl=300)
+def fetch_ohlc(ticker, period, interval):
+    df = yf.download(ticker, period=period, interval=interval, progress=False)
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.dropna()
+    return df
+
+def technical_analysis_dashboard():
+    st.subheader("📈 Análise Técnica (Candles)")
+
+    # Carrega lista local (mesmo arquivo que você usa)
+    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
+    ticker = st.selectbox("Ticker (1 por vez)", options=ticker_list)
+    ticker_yf = f"{ticker}.SA"
+
+    col1, col2, col3 = st.columns([2, 2, 3])
+    with col1:
+        interval_label = st.selectbox("Timeframe", ["Diário", "Semanal", "Mensal"], index=0)
+    with col2:
+        period = st.selectbox("Período", ["3mo", "6mo", "1y", "2y", "5y", "max"], index=2)
+    with col3:
+        show_volume = st.toggle("Mostrar volume", value=True)
+
+    interval = {"Diário": "1d", "Semanal": "1wk", "Mensal": "1mo"}[interval_label]
+
+    df = fetch_ohlc(ticker_yf, period=period, interval=interval)
+
+    if df.empty:
+        st.error("Não consegui baixar os dados desse ticker/período. Tente outro timeframe ou período.")
+        return
+
+    # Candlestick (Plotly)
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Candlestick(
+            x=df.index,
+            open=df["Open"],
+            high=df["High"],
+            low=df["Low"],
+            close=df["Close"],
+            name=ticker
+        )
+    )
+
+    # Volume opcional (como barras no eixo secundário)
+    if show_volume and "Volume" in df.columns:
+        fig.add_trace(
+            go.Bar(
+                x=df.index,
+                y=df["Volume"],
+                name="Volume",
+                opacity=0.30,
+                yaxis="y2"
+            )
+        )
+        fig.update_layout(
+            yaxis2=dict(
+                overlaying="y",
+                side="right",
+                showgrid=False,
+                title="Volume"
+            )
+        )
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=700,
+        title=f"{ticker} • {interval_label} • {period}",
+        xaxis_title="Data",
+        yaxis_title="Preço",
+        xaxis_rangeslider_visible=False,
+        legend=dict(orientation="h"),
+        margin=dict(l=20, r=20, t=50, b=20)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Extras rápidos (opcional): retorno no período e amplitude
+    ret = (df["Close"].iloc[-1] / df["Close"].iloc[0]) - 1
+    amp = (df["High"].max() / df["Low"].min()) - 1
+    c1, c2 = st.columns(2)
+    c1.metric("Retorno no período", f"{ret:.2%}")
+    c2.metric("Amplitude (High/Low)", f"{amp:.2%}")
+
 
 def correlation_dashboard(prices):
     correlation_matrix = calculate_correlation(prices.drop(columns="IBOV"))
@@ -652,7 +741,7 @@ st.set_page_config(layout="wide")
 with st.sidebar:
     selected_tab = st.radio(
         "Escolha a visualização", 
-        ["Dashboard", "Correlação", "Múltiplos","Dividendos", "RRG", "Mapa Ibovespa"]
+        ["Dashboard","Análise Técnica", "Correlação", "Múltiplos","Dividendos", "RRG", "Mapa Ibovespa"]
     )
     
     # Só mostra seletor de tickers para outras abas
@@ -665,8 +754,10 @@ with st.sidebar:
 st.title('Renova Invest - Mercado de Capitais')
 
 # Lógica para exibir a aba correta
-if selected_tab == "Mapa Ibovespa":
-    ibovespa_map()
+if selected_tab in ["Dashboard", "Correlação", "Múltiplos", "Dividendos", "RRG"]:
+    tickers, prices = build_sidebar()
+else:
+    tickers, prices = None, None
 elif selected_tab == "Dashboard":
     if tickers and prices is not None:
         main_dashboard(tickers, prices)
@@ -692,3 +783,5 @@ elif selected_tab == "RRG":
         rrg_graph(tickers, prices)
     else:
         st.warning("Por favor, selecione pelo menos um ticker na barra lateral.")
+elif selected_tab == "Análise Técnica":
+    technical_analysis_dashboard()
