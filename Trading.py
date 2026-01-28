@@ -185,9 +185,9 @@ def technical_analysis_dashboard():
     # =========================
     df = fetch_ohlc(ticker_yf, period=period, interval=interval)
     with st.expander("Debug (dados baixados)"):
-    st.write(df.tail(10))
-    st.write("Colunas:", list(df.columns))
-    st.write("Tipos:", df.dtypes)
+        st.write(df.tail(10))
+        st.write("Colunas:", list(df.columns))
+        st.write("Tipos:", df.dtypes)
 
 
     if df is None or df.empty:
