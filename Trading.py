@@ -194,6 +194,42 @@ def technical_analysis_dashboard():
         st.error("Não foi possível carregar dados para este ativo/período.")
         return
 
+
+
+    # =========================
+# CARDS: PREÇO ATUAL + VARIAÇÕES
+# =========================
+    try:
+        last_close = float(df["Close"].iloc[-1])
+        first_close = float(df["Close"].iloc[0])
+    
+        # Variação do período selecionado (primeiro candle -> último candle)
+        period_change = (last_close / first_close) - 1
+    
+        # Variação do "último candle" vs candle anterior (ex.: diária se interval=1d)
+        if len(df) >= 2:
+            prev_close = float(df["Close"].iloc[-2])
+            last_change = (last_close / prev_close) - 1
+        else:
+            last_change = np.nan
+    
+        cA, cB, cC = st.columns([2, 2, 2])
+    
+        cA.metric("Preço atual (Close)", f"R$ {last_close:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        cB.metric(f"Variação do período ({period})", f"{period_change:+.2%}")
+        cC.metric(
+            f"Variação do último candle ({interval_label})",
+            f"{last_change:+.2%}" if pd.notna(last_change) else "—"
+        )
+    
+    except Exception as e:
+        st.warning(f"Não foi possível calcular preço/variações: {e}")
+
+
+    
+
+    
+
     # =========================
     # GRÁFICO DE CANDLES
     # =========================
