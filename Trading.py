@@ -124,11 +124,39 @@ def main_dashboard(tickers, prices):
 
 @st.cache_data(ttl=300)
 def fetch_ohlc(ticker, period, interval):
-    df = yf.download(ticker, period=period, interval=interval, progress=False)
+    df = yf.download(
+        ticker,
+        period=period,
+        interval=interval,
+        progress=False,
+        auto_adjust=False
+    )
+
     if df is None or df.empty:
         return pd.DataFrame()
-    df = df.dropna()
+
+    # Se vier MultiIndex (já vi acontecer), achata
+    if isinstance(df.columns, pd.MultiIndex):
+        # tenta pegar o nível 0 (Open/High/Low/Close/Volume)
+        df.columns = df.columns.get_level_values(0)
+
+    # Garante que as colunas existem
+    required = ["Open", "High", "Low", "Close"]
+    if not all(col in df.columns for col in required):
+        return pd.DataFrame()
+
+    # Converte pra numérico (se vier object)
+    for col in required + (["Volume"] if "Volume" in df.columns else []):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Remove linhas inválidas
+    df = df.dropna(subset=required)
+
+    # Ordena por data
+    df = df.sort_index()
+
     return df
+
 
 def technical_analysis_dashboard():
     st.subheader("📈 Análise Técnica (Candles)")
@@ -156,6 +184,11 @@ def technical_analysis_dashboard():
     # DADOS
     # =========================
     df = fetch_ohlc(ticker_yf, period=period, interval=interval)
+    with st.expander("Debug (dados baixados)"):
+    st.write(df.tail(10))
+    st.write("Colunas:", list(df.columns))
+    st.write("Tipos:", df.dtypes)
+
 
     if df is None or df.empty:
         st.error("Não foi possível carregar dados para este ativo/período.")
@@ -168,11 +201,11 @@ def technical_analysis_dashboard():
 
     fig.add_trace(
         go.Candlestick(
-            x=df.index,
-            open=df["Open"],
-            high=df["High"],
-            low=df["Low"],
-            close=df["Close"],
+            x=df.index.to_pydatetime(),
+            open=df["Open"].values,
+            high=df["High"].values,
+            low=df["Low"].values,
+            close=df["Close"].values,
             name=ticker
         )
     )
