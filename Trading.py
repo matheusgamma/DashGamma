@@ -947,12 +947,20 @@ def foreign_flow_dashboard():
     with st.spinner("Baixando dados da B3..."):
         text = download_b3_dados_mercado_text()
 
-    # título exato citado na página da B3 (pode variar levemente), então buscamos por pedaço
-    df = extract_table_from_report(
-        text,
-        table_title_contains="Movimentação dos Investidores Estrangeiros Mensal",
-        sep=";"
-    )
+    # tenta vários nomes que aparecem no CSV da B3
+    candidates = [
+        "Estrangeiros Mensal",  # aparece no próprio CSV
+        "Investidores Estrangeiros Mensal",
+        "Monthly Financial Movement of Foreign Investors",
+        "Movimentação dos Investidores Estrangeiros"
+    ]
+    
+    df = pd.DataFrame()
+    for key in candidates:
+        df = extract_table_from_report(text, table_title_contains=key, sep=";")
+        if not df.empty:
+            break
+
 
     if df.empty:
         st.error("Não encontrei a tabela de 'Movimentação dos Investidores Estrangeiros Mensal' no arquivo da B3.")
