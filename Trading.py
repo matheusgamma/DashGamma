@@ -1005,11 +1005,46 @@ def foreign_flow_dashboard():
             st.dataframe(df.head(30), use_container_width=True)
         return
 
-    # filtro de anos
+    # garante que Mes é datetime e remove inválidos
+    out["Mes"] = pd.to_datetime(out["Mes"], errors="coerce")
+    out = out.dropna(subset=["Mes"]).sort_values("Mes")
+    
+    if out.empty:
+        st.error("Consegui ler a tabela, mas não consegui interpretar as datas (Mês) do relatório da B3.")
+        with st.expander("Debug (tabela crua extraída)"):
+            st.dataframe(df.head(50), use_container_width=True)
+        return
+    
     min_date = out["Mes"].min()
     max_date = out["Mes"].max()
-    start = st.date_input("De", value=max(min_date.date(), (max_date - pd.DateOffset(years=5)).date()))
+    
+    # fallback seguro caso ainda haja NaT (muito raro)
+    if pd.isna(min_date) or pd.isna(max_date):
+        st.error("Datas inválidas no relatório (min/max).")
+        return
+
+
+    out["Mes"] = pd.to_datetime(out["Mes"], errors="coerce")
+    out = out.dropna(subset=["Mes"]).sort_values("Mes")
+    
+    if out.empty:
+        st.error("Não foi possível interpretar as datas (Mês) do relatório da B3.")
+        return
+    
+    min_date = out["Mes"].min()
+    max_date = out["Mes"].max()
+    
+    default_start = max_date - pd.DateOffset(years=5)
+    default_start = max(default_start, min_date)
+    
+    start = st.date_input("De", value=default_start.date())
     end = st.date_input("Até", value=max_date.date())
+
+    # =========================
+# FILTRO DE PERÍODO (SEGURO)
+# =======================
+
+    
 
     mask = (out["Mes"].dt.date >= start) & (out["Mes"].dt.date <= end)
     outf = out.loc[mask].copy()
