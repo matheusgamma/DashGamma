@@ -831,7 +831,7 @@ with st.sidebar:
          "Análise Técnica", "Notícias", "RRG", "Mapa Ibovespa"]
     )
 
-    if selected_tab in ["Dashboard", "Correlação", "Múltiplos", "Fluxo estrangeiro", "Dividendos", "RRG"]:
+    if selected_tab in ["Dashboard", "Correlação", "Múltiplos", "Dividendos", "RRG"]:
         tickers, prices = build_sidebar()
     else:
         tickers, prices = None, None
@@ -1073,7 +1073,7 @@ elif selected_tab == "Análise Técnica":
 elif selected_tab == "Notícias":
     news_terminal()
 
-elif selected_tab == "Fluxo Estrangeiro":
+elif selected_tab == "Fluxo estrangeiro":
     foreign_flow_dashboard()
 
 elif selected_tab == "RRG":
