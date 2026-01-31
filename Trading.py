@@ -12,6 +12,7 @@ import yahooquery as yq
 from bs4 import BeautifulSoup
 import plotly.graph_objects as go
 import requests
+import re
 
 
 def build_sidebar():
