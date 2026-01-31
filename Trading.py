@@ -831,13 +831,212 @@ with st.sidebar:
          "Análise Técnica", "Notícias", "RRG", "Mapa Ibovespa"]
     )
 
-    if selected_tab in ["Dashboard", "Correlação", "Múltiplos", "Dividendos", "RRG"]:
+    if selected_tab in ["Dashboard", "Correlação", "Múltiplos", "Fluxo estrangeiro", "Dividendos", "RRG"]:
         tickers, prices = build_sidebar()
     else:
         tickers, prices = None, None
 
 # Título principal
 st.title('Renova Invest - Mercado de Capitais')
+
+B3_DADOS_MERCADO_URL = "https://sistemaswebb3-listados.b3.com.br/marketDataProxy/MarketDataCall/GetDownloadMarketData/RELATORIO_DADOS_DE_MERCADO.csv"
+
+
+@st.cache_data(ttl=60*60)  # 1h
+def download_b3_dados_mercado_text():
+    r = requests.get(B3_DADOS_MERCADO_URL, timeout=30)
+    r.raise_for_status()
+    # a B3 costuma servir com separador ; e acentuação ok
+    return r.text
+
+
+def extract_table_from_report(text, table_title_contains, sep=";"):
+    """
+    Extrai uma tabela “embutida” no CSV-relatório da B3.
+    Procura uma linha que contenha table_title_contains e usa a linha seguinte como cabeçalho.
+    Para quando encontra linha vazia (ou uma linha com 1 coluna).
+    """
+    lines = [ln.strip("\ufeff") for ln in text.splitlines()]
+    start_idx = None
+
+    # acha o título da tabela
+    for i, ln in enumerate(lines):
+        if table_title_contains.lower() in ln.lower():
+            start_idx = i
+            break
+
+    if start_idx is None:
+        return pd.DataFrame()
+
+    # avança até achar um "header" com separador
+    header_idx = None
+    for j in range(start_idx + 1, min(start_idx + 30, len(lines))):
+        if sep in lines[j] and len(lines[j].split(sep)) >= 3:
+            header_idx = j
+            break
+
+    if header_idx is None:
+        return pd.DataFrame()
+
+    header = [h.strip() for h in lines[header_idx].split(sep)]
+    data = []
+
+    for k in range(header_idx + 1, len(lines)):
+        ln = lines[k].strip()
+        if not ln:
+            break
+        parts = [p.strip() for p in ln.split(sep)]
+
+        # se "quebrar" de seção (linha muito curta), para
+        if len(parts) < max(2, len(header) // 2):
+            break
+
+        # ajusta tamanho
+        if len(parts) < len(header):
+            parts += [""] * (len(header) - len(parts))
+        if len(parts) > len(header):
+            parts = parts[:len(header)]
+
+        data.append(parts)
+
+    df = pd.DataFrame(data, columns=header)
+    return df
+
+
+def parse_month_year(col):
+    """
+    Converte coisas do tipo 'Jan/2025', '01/2025', '2025-01' etc para datetime (1º dia do mês).
+    """
+    s = str(col).strip()
+
+    # tenta dd/mm/yyyy ou mm/yyyy
+    for fmt in ("%m/%Y", "%Y-%m", "%b/%Y", "%B/%Y"):
+        try:
+            dt = pd.to_datetime(s, format=fmt)
+            return dt.replace(day=1)
+        except:
+            pass
+
+    # fallback: pandas
+    dt = pd.to_datetime(s, errors="coerce", dayfirst=True)
+    if pd.isna(dt):
+        return None
+    return dt.replace(day=1)
+
+
+def to_float_br(x):
+    """
+    Converte número BR do relatório (ex: '1.234,56' ou '123,4') pra float.
+    """
+    if x is None:
+        return np.nan
+    s = str(x).strip()
+    if s == "" or s.lower() == "nan":
+        return np.nan
+    s = s.replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except:
+        return np.nan
+
+
+def foreign_flow_dashboard():
+    st.subheader("🌍 Fluxo Estrangeiro (B3) — mês a mês")
+
+    with st.spinner("Baixando dados da B3..."):
+        text = download_b3_dados_mercado_text()
+
+    # título exato citado na página da B3 (pode variar levemente), então buscamos por pedaço
+    df = extract_table_from_report(
+        text,
+        table_title_contains="Movimentação dos Investidores Estrangeiros Mensal",
+        sep=";"
+    )
+
+    if df.empty:
+        st.error("Não encontrei a tabela de 'Movimentação dos Investidores Estrangeiros Mensal' no arquivo da B3.")
+        return
+
+    # tenta descobrir colunas principais
+    # normalmente há algo como: Mês, Compra, Venda, Saldo (em R$ milhões)
+    cols = [c.lower() for c in df.columns]
+    month_col = None
+    for c in df.columns:
+        if "mês" in c.lower() or "mes" in c.lower() or "month" in c.lower() or "período" in c.lower() or "period" in c.lower():
+            month_col = c
+            break
+    if month_col is None:
+        month_col = df.columns[0]  # fallback: primeira coluna
+
+    # identifica compra/venda/saldo por nomes (fallbacks)
+    buy_col = next((c for c in df.columns if "compra" in c.lower() or "buy" in c.lower()), None)
+    sell_col = next((c for c in df.columns if "venda" in c.lower() or "sell" in c.lower()), None)
+    net_col = next((c for c in df.columns if "saldo" in c.lower() or "net" in c.lower() or "balance" in c.lower()), None)
+
+    # converte datas e números
+    out = pd.DataFrame()
+    out["Mes"] = df[month_col].apply(parse_month_year)
+    if buy_col:  out["Compra"] = df[buy_col].apply(to_float_br)
+    if sell_col: out["Venda"] = df[sell_col].apply(to_float_br)
+    if net_col:  out["Saldo"] = df[net_col].apply(to_float_br)
+
+    out = out.dropna(subset=["Mes"]).sort_values("Mes")
+
+    # se não existir Saldo, tenta criar Compra - Venda
+    if "Saldo" not in out.columns and "Compra" in out.columns and "Venda" in out.columns:
+        out["Saldo"] = out["Compra"] - out["Venda"]
+
+    if "Saldo" not in out.columns:
+        st.error("A tabela foi lida, mas não consegui identificar as colunas de Compra/Venda/Saldo.")
+        with st.expander("Debug (prévia da tabela)"):
+            st.dataframe(df.head(30), use_container_width=True)
+        return
+
+    # filtro de anos
+    min_date = out["Mes"].min()
+    max_date = out["Mes"].max()
+    start = st.date_input("De", value=max(min_date.date(), (max_date - pd.DateOffset(years=5)).date()))
+    end = st.date_input("Até", value=max_date.date())
+
+    mask = (out["Mes"].dt.date >= start) & (out["Mes"].dt.date <= end)
+    outf = out.loc[mask].copy()
+
+    if outf.empty:
+        st.warning("Sem dados no intervalo selecionado.")
+        return
+
+    # cards
+    last = outf.iloc[-1]
+    ytd = outf[outf["Mes"].dt.year == outf["Mes"].dt.year.max()]["Saldo"].sum()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Último mês (saldo)", f"R$ {last['Saldo']:,.0f} mi")
+    c2.metric("Acumulado no ano", f"R$ {ytd:,.0f} mi")
+    c3.metric("Meses exibidos", f"{len(outf)}")
+
+    # gráfico: barras do saldo + (opcional) linhas de compra/venda
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=outf["Mes"], y=outf["Saldo"], name="Saldo (R$ mi)"))
+
+    if "Compra" in outf.columns:
+        fig.add_trace(go.Scatter(x=outf["Mes"], y=outf["Compra"], name="Compra", mode="lines"))
+    if "Venda" in outf.columns:
+        fig.add_trace(go.Scatter(x=outf["Mes"], y=outf["Venda"], name="Venda", mode="lines"))
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=650,
+        title="Fluxo Estrangeiro — mês a mês (B3, R$ milhões)",
+        xaxis_title="Mês",
+        yaxis_title="R$ milhões",
+        barmode="relative",
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    with st.expander("Tabela"):
+        st.dataframe(outf, use_container_width=True)
+
 
 # Lógica para exibir a aba correta
 # Lógica para exibir a aba correta
@@ -873,6 +1072,9 @@ elif selected_tab == "Análise Técnica":
 
 elif selected_tab == "Notícias":
     news_terminal()
+
+elif selected_tab == "Fluxo Estrangeiro":
+    foreign_flow_dashboard()
 
 elif selected_tab == "RRG":
     if tickers and prices is not None:
