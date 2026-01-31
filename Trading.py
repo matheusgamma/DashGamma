@@ -827,7 +827,7 @@ st.set_page_config(layout="wide")
 with st.sidebar:
     selected_tab = st.radio(
         "Escolha a visualização",
-        ["Dashboard", "Correlação", "Múltiplos", "Dividendos",
+        ["Dashboard", "Correlação", "Múltiplos","Fluxo estrangeiro", "Dividendos",
          "Análise Técnica", "Notícias", "RRG", "Mapa Ibovespa"]
     )
 
