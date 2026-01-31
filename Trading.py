@@ -872,9 +872,13 @@ def extract_table_from_report(text, table_title_contains, sep=";"):
     # avança até achar um "header" com separador
     header_idx = None
     for j in range(start_idx + 1, min(start_idx + 30, len(lines))):
-        if sep in lines[j] and len(lines[j].split(sep)) >= 3:
-            header_idx = j
-            break
+        if sep in lines[j]:
+            parts = [p.strip() for p in lines[j].split(sep)]
+            # heurística: header costuma ter "Mês" ou "Month" e pelo menos 2-3 colunas
+            if len(parts) >= 2 and any(("mês" in p.lower() or "mes" in p.lower() or "month" in p.lower()) for p in parts):
+                header_idx = j
+                break
+    
 
     if header_idx is None:
         return pd.DataFrame()
