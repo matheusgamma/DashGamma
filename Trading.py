@@ -908,25 +908,75 @@ def extract_table_from_report(text, table_title_contains, sep=";"):
     return df
 
 
-def parse_month_year(col):
-    """
-    Converte coisas do tipo 'Jan/2025', '01/2025', '2025-01' etc para datetime (1º dia do mês).
-    """
-    s = str(col).strip()
 
-    # tenta dd/mm/yyyy ou mm/yyyy
-    for fmt in ("%m/%Y", "%Y-%m", "%b/%Y", "%B/%Y"):
-        try:
-            dt = pd.to_datetime(s, format=fmt)
+def parse_month_year(value):
+    """
+    Converte strings do tipo:
+    - "Jan/Jan/2025"
+    - "Fev/Feb/2025"
+    - "Set/Sep/2025"
+    - "01/2025"
+    - "2025-01"
+    para datetime (1º dia do mês).
+    """
+    if value is None:
+        return None
+
+    s = str(value).strip()
+    if not s:
+        return None
+
+    # Caso específico B3: "Jan/Jan/2025" (PT/EN/AAAA)
+    if s.count("/") >= 2:
+        parts = s.split("/")
+        # ex: ["Jan","Jan","2025"] ou ["Fev","Feb","2025"]
+        year_str = parts[-1]
+        month_str = parts[0]  # pega o PT (primeira parte)
+
+        # extrai ano
+        m = re.search(r"\d{4}", year_str)
+        if not m:
+            return None
+        year = int(m.group())
+
+        # mapa de meses (PT + EN)
+        month_map = {
+            "jan": 1, "janeiro": 1,
+            "fev": 2, "feb": 2, "fevereiro": 2,
+            "mar": 3, "march": 3, "março": 3,
+            "abr": 4, "apr": 4, "abril": 4,
+            "mai": 5, "may": 5, "maio": 5,
+            "jun": 6, "june": 6, "junho": 6,
+            "jul": 7, "july": 7, "julho": 7,
+            "ago": 8, "aug": 8, "agosto": 8,
+            "set": 9, "sep": 9, "setembro": 9,
+            "out": 10, "oct": 10, "outubro": 10,
+            "nov": 11, "november": 11, "novembro": 11,
+            "dez": 12, "dec": 12, "december": 12, "dezembro": 12,
+        }
+
+        key = month_str.strip().lower()
+        # remove pontos (às vezes vem "Sep." etc)
+        key = key.replace(".", "")
+
+        month = month_map.get(key)
+        if not month:
+            return None
+
+        return pd.Timestamp(year=year, month=month, day=1)
+
+    # Outros formatos comuns
+    for fmt in ("%m/%Y", "%Y-%m"):
+        dt = pd.to_datetime(s, format=fmt, errors="coerce")
+        if not pd.isna(dt):
             return dt.replace(day=1)
-        except:
-            pass
 
-    # fallback: pandas
+    # fallback geral
     dt = pd.to_datetime(s, errors="coerce", dayfirst=True)
     if pd.isna(dt):
         return None
     return dt.replace(day=1)
+
 
 
 def to_float_br(x):
