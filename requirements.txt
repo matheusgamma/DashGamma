@@ -10,3 +10,5 @@ matplotlib
 yahooquery
 bs4
 requests
+re
+
