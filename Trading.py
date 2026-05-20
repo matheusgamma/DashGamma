@@ -251,6 +251,16 @@ def download_screener_data(tickers_tuple: tuple) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=3600)
+def fetch_ticker_info(ticker: str) -> dict:
+    """Retorna o dict .info do yfinance com todos os múltiplos do ativo."""
+    try:
+        info = yf.Ticker(ticker).info
+        return info if isinstance(info, dict) else {}
+    except Exception:
+        return {}
+
+
+@st.cache_data(ttl=3600)
 def download_b3_dados_mercado_text() -> str:
     r = requests.get(B3_DADOS_MERCADO_URL, timeout=30)
     r.raise_for_status()
@@ -653,6 +663,17 @@ def screener_dashboard():
 # ABA: MÚLTIPLOS
 # ─────────────────────────────────────────────
 
+def _fmt(value, suffix="", decimals=2, scale=1):
+    """Formata um número ou retorna 'N/A' se inválido."""
+    try:
+        v = float(value) * scale
+        if not np.isfinite(v):
+            return "N/A"
+        return f"{v:.{decimals}f}{suffix}"
+    except Exception:
+        return "N/A"
+
+
 def multiples_dashboard(tickers):
     st.markdown('<div class="sec-label">📋 Múltiplos Financeiros</div>', unsafe_allow_html=True)
 
@@ -660,109 +681,135 @@ def multiples_dashboard(tickers):
         st.warning("Selecione pelo menos um ticker.")
         return
 
-    try:
-        td   = yq.Ticker(tickers)
-        summ = td.summary_detail
-        ks   = td.key_stats
+    financial_data = []
 
-        financial_data = []
-        for ticker in tickers:
-            tk = ticker.removesuffix(".SA")
-            s  = summ.get(ticker, {})
-            k  = ks.get(ticker, {})
+    for ticker in tickers:
+        tk = ticker.removesuffix(".SA")
+        with st.spinner(f"Carregando dados de {tk}..."):
+            info = fetch_ticker_info(ticker)
 
-            try:
-                net_income   = k.get("netIncomeToCommon")
-                bvps         = k.get("bookValue")
-                shares       = k.get("sharesOutstanding")
-                total_equity = bvps * shares if bvps and shares else None
-                roe_val      = (net_income / total_equity * 100) if net_income and total_equity else None
-                roe_str      = f"{roe_val:.2f}%" if roe_val is not None else "N/A"
+        if not info:
+            st.warning(f"{tk}: dados não disponíveis no Yahoo Finance.")
+            continue
 
-                pl       = s.get("trailingPE")
-                pvp      = k.get("priceToBook")
-                margin   = k.get("profitMargins")
-                dy       = s.get("dividendYield")
-                ebitda_m = k.get("enterpriseToEbitda")
+        # Coleta dos campos — yfinance .info é a fonte mais confiável para B3
+        pl        = info.get("trailingPE")
+        pvp       = info.get("priceToBook")
+        lpa       = info.get("trailingEps")
+        roe_raw   = info.get("returnOnEquity")       # decimal ex: 0.18 = 18%
+        dy_raw    = info.get("dividendYield")         # decimal ex: 0.06 = 6%
+        margin    = info.get("profitMargins")         # decimal
+        ebitda_m  = info.get("enterpriseToEbitda")
+        preco     = info.get("currentPrice") or info.get("regularMarketPrice")
+        mktcap    = info.get("marketCap")
+        high52    = info.get("fiftyTwoWeekHigh")
+        low52     = info.get("fiftyTwoWeekLow")
+        nome      = info.get("longName") or info.get("shortName") or tk
 
-                dy_pct     = dy * 100 if dy else None
-                margin_pct = margin * 100 if margin else None
-                score      = calc_fund_score(pl, pvp, roe_val, dy_pct, margin_pct)
+        roe_pct    = roe_raw  * 100 if isinstance(roe_raw,  float) else None
+        dy_pct     = dy_raw   * 100 if isinstance(dy_raw,   float) else None
+        margin_pct = margin   * 100 if isinstance(margin,   float) else None
+        score      = calc_fund_score(pl, pvp, roe_pct, dy_pct, margin_pct)
 
-                financial_data.append({
-                    "Ticker":        tk,
-                    "P/L":           round(pl, 2)       if isinstance(pl, float)       else "N/A",
-                    "P/VP":          round(pvp, 2)      if isinstance(pvp, float)      else "N/A",
-                    "LPA":           k.get("trailingEps", "N/A"),
-                    "Margem Líq.":   f"{margin_pct:.2f}%" if margin_pct else "N/A",
-                    "Margem EBITDA": f"{ebitda_m:.2f}"    if isinstance(ebitda_m, float) else "N/A",
-                    "ROE":           roe_str,
-                    "DY":            f"{dy_pct:.2f}%"    if dy_pct else "N/A",
-                    "Score":         score,
-                    "_roe":          roe_val,
-                    "_dy":           dy_pct,
-                    "_margin":       margin_pct,
-                })
-            except Exception as e:
-                st.error(f"Erro ao processar {tk}: {e}")
+        financial_data.append({
+            "Ticker":        tk,
+            "Nome":          nome,
+            "Preço":         _fmt(preco,    " R$", 2),
+            "P/L":           _fmt(pl,       "",    2),
+            "P/VP":          _fmt(pvp,      "",    2),
+            "LPA":           _fmt(lpa,      " R$", 2),
+            "ROE":           _fmt(roe_pct,  "%",   2),
+            "DY":            _fmt(dy_pct,   "%",   2),
+            "Margem Líq.":   _fmt(margin_pct,"%",  2),
+            "EV/EBITDA":     _fmt(ebitda_m, "",    2),
+            "Máx 52s":       _fmt(high52,   " R$", 2),
+            "Mín 52s":       _fmt(low52,    " R$", 2),
+            "Mkt Cap":       f"R$ {mktcap/1e9:.1f} bi" if isinstance(mktcap, (int, float)) else "N/A",
+            "Score":         score,
+            # valores numéricos para gráficos
+            "_pl":           pl       if isinstance(pl,      float) else None,
+            "_pvp":          pvp      if isinstance(pvp,     float) else None,
+            "_roe":          roe_pct,
+            "_dy":           dy_pct,
+        })
 
-        for co in financial_data:
-            with st.container(border=True):
-                hdr, *_ = st.columns([1, 11])
-                with hdr:
-                    try:
-                        st.image(f"https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/{co['Ticker']}.png", width=60)
-                    except Exception:
-                        pass
+    if not financial_data:
+        st.error("Nenhum dado foi carregado. Verifique os tickers selecionados.")
+        return
 
-                score = co["Score"]
+    # ── Cards por ativo ──────────────────────────────────────────────
+    for co in financial_data:
+        with st.container(border=True):
+            logo_col, info_col = st.columns([1, 11])
+            with logo_col:
+                try:
+                    st.image(
+                        f"https://raw.githubusercontent.com/thefintz/icones-b3/main/icones/{co['Ticker']}.png",
+                        width=55,
+                    )
+                except Exception:
+                    pass
+            with info_col:
+                score     = co["Score"]
                 score_cls = "score-hi" if score >= 7 else ("score-md" if score >= 4 else "score-lo")
                 score_lbl = "Excelente" if score >= 7 else ("Regular" if score >= 4 else "Fraco")
 
-                title_col, score_col = st.columns([9, 1])
-                title_col.subheader(co["Ticker"], divider="red")
-                score_col.markdown(
-                    f'<div style="text-align:center"><span class="{score_cls}">{score}/10</span>'
+                th, sc = st.columns([9, 1])
+                th.subheader(f"{co['Ticker']}  —  {co['Nome']}", divider="red")
+                sc.markdown(
+                    f'<div style="text-align:center">'
+                    f'<span class="{score_cls}">{score}/10</span>'
                     f'<br><small style="color:#64748b">{score_lbl}</small></div>',
-                    unsafe_allow_html=True
+                    unsafe_allow_html=True,
                 )
 
-                c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-                c1.metric("P/L",           str(co["P/L"]))
-                c2.metric("P/VP",          str(co["P/VP"]))
-                c3.metric("LPA",           str(co["LPA"]))
-                c4.metric("ROE",           co["ROE"])
-                c5.metric("DY",            co["DY"])
-                c6.metric("Margem Líq.",   co["Margem Líq."])
-                c7.metric("Margem EBITDA", co["Margem EBITDA"])
+            # linha 1: preço e avaliação
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.metric("Preço atual",  co["Preço"])
+            c2.metric("P/L",          co["P/L"])
+            c3.metric("P/VP",         co["P/VP"])
+            c4.metric("LPA",          co["LPA"])
+            c5.metric("Mkt Cap",      co["Mkt Cap"])
 
-        style_metric_cards(background_color="rgba(255,255,255,0)")
+            # linha 2: rentabilidade e outros
+            c6, c7, c8, c9, c10 = st.columns(5)
+            c6.metric("ROE",          co["ROE"])
+            c7.metric("DY",           co["DY"])
+            c8.metric("Margem Líq.",  co["Margem Líq."])
+            c9.metric("EV/EBITDA",    co["EV/EBITDA"])
+            c10.metric("Máx / Mín 52s", f"{co['Máx 52s']} / {co['Mín 52s']}")
 
-        # Comparativo visual entre ativos selecionados
-        if len(financial_data) > 1:
-            st.markdown('<div class="sec-label">Comparativo entre ativos</div>', unsafe_allow_html=True)
-            compare_df = pd.DataFrame([{
-                "Ticker": co["Ticker"],
-                "P/L":    co["P/L"] if isinstance(co["P/L"], float) else 0,
-                "P/VP":   co["P/VP"] if isinstance(co["P/VP"], float) else 0,
-                "ROE":    co["_roe"] or 0,
-                "DY":     co["_dy"] or 0,
-            } for co in financial_data])
+    style_metric_cards(background_color="rgba(255,255,255,0)")
 
-            tab1, tab2 = st.tabs(["P/L e P/VP", "ROE e DY"])
-            with tab1:
-                fig = px.bar(compare_df.melt(id_vars="Ticker", value_vars=["P/L", "P/VP"]),
-                             x="Ticker", y="value", color="variable", barmode="group",
-                             template="plotly_dark", height=350)
-                st.plotly_chart(fig, use_container_width=True)
-            with tab2:
-                fig = px.bar(compare_df.melt(id_vars="Ticker", value_vars=["ROE", "DY"]),
-                             x="Ticker", y="value", color="variable", barmode="group",
-                             template="plotly_dark", height=350)
-                st.plotly_chart(fig, use_container_width=True)
+    # ── Comparativo visual (só com 2+ ativos) ───────────────────────
+    if len(financial_data) > 1:
+        st.markdown('<div class="sec-label">Comparativo entre ativos</div>', unsafe_allow_html=True)
 
-    except Exception as e:
-        st.error(f"Erro geral ao obter dados financeiros: {e}")
+        compare_df = pd.DataFrame([{
+            "Ticker": co["Ticker"],
+            "P/L":    co["_pl"]  or 0,
+            "P/VP":   co["_pvp"] or 0,
+            "ROE (%)": co["_roe"] or 0,
+            "DY (%)":  co["_dy"]  or 0,
+        } for co in financial_data])
+
+        tab1, tab2 = st.tabs(["Valuation (P/L e P/VP)", "Rentabilidade (ROE e DY)"])
+        with tab1:
+            fig = px.bar(
+                compare_df.melt(id_vars="Ticker", value_vars=["P/L", "P/VP"]),
+                x="Ticker", y="value", color="variable", barmode="group",
+                template="plotly_dark", height=360,
+                color_discrete_map={"P/L": "#38bdf8", "P/VP": "#a78bfa"},
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        with tab2:
+            fig = px.bar(
+                compare_df.melt(id_vars="Ticker", value_vars=["ROE (%)", "DY (%)"]),
+                x="Ticker", y="value", color="variable", barmode="group",
+                template="plotly_dark", height=360,
+                color_discrete_map={"ROE (%)": "#22c55e", "DY (%)": "#f59e0b"},
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 
 # ─────────────────────────────────────────────
