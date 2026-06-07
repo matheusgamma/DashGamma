@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_extras.grid import grid
+from streamlit_option_menu import option_menu
 import seaborn as sns
 import matplotlib.pyplot as plt
 import yahooquery as yq
@@ -70,8 +71,16 @@ IBOV_COMPOSITION = {
 
 def inject_css():
     st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-    .block-container { padding-top: 1.2rem; padding-bottom: 1rem; }
+    /* ── Fonte global ── */
+    html, body, [class*="css"], .stMarkdown, .stMetric,
+    .stSelectbox, .stMultiSelect, .stTextInput, .stButton,
+    button, input, label, p, span, div {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+
+    .block-container { padding-top: 0.6rem; padding-bottom: 1rem; }
 
     /* Sidebar */
     [data-testid="stSidebar"] {
@@ -1490,59 +1499,96 @@ st.set_page_config(
 )
 inject_css()
 
-TABS_WITH_TICKERS = ["Dashboard", "Correlação", "Múltiplos", "Resultados", "Dividendos", "Agenda", "RRG"]
+# ── Navbar horizontal superior ────────────────────────────────────────
+TAB_NAMES = [
+    "Dashboard", "Analise Tecnica", "Screener", "Multiplos", "Resultados",
+    "Correlacao", "Dividendos", "Fluxo", "Agenda", "Watchlist",
+    "RRG", "Mapa IBOV", "Noticias",
+]
+TAB_ICONS = [
+    "bar-chart-fill", "graph-up-arrow", "search", "clipboard-data", "file-bar-graph-fill",
+    "grid-3x3-gap-fill", "cash-coin", "globe-americas", "calendar3", "star-fill",
+    "arrow-repeat", "map-fill", "newspaper",
+]
 
-with st.sidebar:
-    selected_tab = st.radio(
-        "Navegação",
-        ["📊 Dashboard", "📈 Análise Técnica", "🔍 Screener",
-         "📋 Múltiplos", "📉 Resultados", "🔗 Correlação",
-         "💰 Dividendos", "🌍 Fluxo Estrangeiro", "🗓️ Agenda",
-         "⭐ Watchlist", "🔄 RRG", "🗺️ Mapa Ibovespa", "📰 Notícias"],
-        label_visibility="collapsed",
-    )
-    tab_key = selected_tab.split(" ", 1)[1]  # remove emoji prefix
-    st.markdown("---")
-    if tab_key in TABS_WITH_TICKERS:
-        tickers, prices = build_sidebar()
-    else:
-        tickers, prices = None, None
-
-# Header
-st.markdown(
-    '<div class="main-title">Renova Invest</div>'
-    '<div class="main-subtitle">Mercado de Capitais · B3</div>',
-    unsafe_allow_html=True
+selected_tab = option_menu(
+    menu_title=None,
+    options=TAB_NAMES,
+    icons=TAB_ICONS,
+    orientation="horizontal",
+    styles={
+        "container": {
+            "padding": "4px 0 0 0",
+            "background-color": "#0d1117",
+            "border-bottom": "1px solid #1e2d3d",
+            "margin-bottom": "16px",
+        },
+        "icon": {
+            "color": "#64748b",
+            "font-size": "13px",
+        },
+        "nav-link": {
+            "font-family": "Inter, sans-serif",
+            "font-size": "13px",
+            "font-weight": "500",
+            "color": "#94a3b8",
+            "padding": "8px 12px",
+            "border-radius": "6px 6px 0 0",
+            "--hover-color": "#161f2e",
+        },
+        "nav-link-selected": {
+            "background-color": "#161f2e",
+            "color": "#00d28c",
+            "font-weight": "600",
+            "border-bottom": "2px solid #00d28c",
+        },
+        "icon-selected": {"color": "#00d28c"},
+    },
 )
 
-# Roteamento
-NEEDS_TICKERS = {"Dashboard", "Correlação", "Múltiplos", "Resultados", "Dividendos", "Agenda", "RRG"}
+# ── Sidebar: só aparece quando a aba precisa de tickers ───────────────
+TABS_WITH_TICKERS = {"Dashboard", "Correlacao", "Multiplos", "Resultados", "Dividendos", "Agenda", "RRG"}
 
-if tab_key in NEEDS_TICKERS and (not tickers or prices is None):
+with st.sidebar:
+    if selected_tab in TABS_WITH_TICKERS:
+        tickers, prices = build_sidebar()
+    else:
+        st.image("images/avatar-renova-instagram.png")
+        tickers, prices = None, None
+
+# ── Header ────────────────────────────────────────────────────────────
+st.markdown(
+    '<div class="main-title">Renova Invest</div>'
+    '<div class="main-subtitle">Mercado de Capitais  ·  B3</div>',
+    unsafe_allow_html=True,
+)
+
+# ── Roteamento ────────────────────────────────────────────────────────
+if selected_tab in TABS_WITH_TICKERS and (not tickers or prices is None):
     st.warning("Selecione pelo menos um ticker na barra lateral.")
-elif tab_key == "Dashboard":
+elif selected_tab == "Dashboard":
     main_dashboard(tickers, prices)
-elif tab_key == "Análise Técnica":
+elif selected_tab == "Analise Tecnica":
     technical_analysis_dashboard()
-elif tab_key == "Screener":
+elif selected_tab == "Screener":
     screener_dashboard()
-elif tab_key == "Múltiplos":
+elif selected_tab == "Multiplos":
     multiples_dashboard(tickers)
-elif tab_key == "Resultados":
+elif selected_tab == "Resultados":
     results_dashboard(tickers)
-elif tab_key == "Correlação":
+elif selected_tab == "Correlacao":
     correlation_dashboard(prices)
-elif tab_key == "Dividendos":
+elif selected_tab == "Dividendos":
     dividends_dashboard(tickers)
-elif tab_key == "Fluxo Estrangeiro":
+elif selected_tab == "Fluxo":
     foreign_flow_dashboard()
-elif tab_key == "Agenda":
+elif selected_tab == "Agenda":
     agenda_dashboard(tickers)
-elif tab_key == "Watchlist":
+elif selected_tab == "Watchlist":
     watchlist_dashboard()
-elif tab_key == "RRG":
+elif selected_tab == "RRG":
     rrg_graph(tickers, prices)
-elif tab_key == "Mapa Ibovespa":
+elif selected_tab == "Mapa IBOV":
     ibovespa_map()
-elif tab_key == "Notícias":
+elif selected_tab == "Noticias":
     news_terminal()
