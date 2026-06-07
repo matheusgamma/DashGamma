@@ -1514,17 +1514,6 @@ st.set_page_config(
 )
 inject_css()
 
-# ── Header ────────────────────────────────────────────────────────────
-col_logo, col_title = st.columns([1, 11])
-with col_logo:
-    st.image("images/avatar-renova-instagram.png", width=72)
-with col_title:
-    st.markdown(
-        '<div class="main-title">Renova Invest</div>'
-        '<div class="main-subtitle">Mercado de Capitais  ·  B3</div>',
-        unsafe_allow_html=True,
-    )
-
 # ── Navbar horizontal ─────────────────────────────────────────────────
 TAB_NAMES = [
     "Dashboard", "Analise Tecnica", "Screener", "Multiplos", "Resultados",
@@ -1571,6 +1560,12 @@ selected_tab = option_menu(
 
 # ── Controles de ativos (inline, sem sidebar) ─────────────────────────
 TABS_WITH_TICKERS = {"Dashboard", "Correlacao", "Multiplos", "Resultados", "Dividendos", "Agenda", "RRG"}
+
+st.markdown(
+    '<div class="main-title">Renova Invest</div>'
+    '<div class="main-subtitle">Mercado de Capitais  ·  B3</div>',
+    unsafe_allow_html=True,
+)
 
 tickers, prices = None, None
 if selected_tab in TABS_WITH_TICKERS:
