@@ -71,9 +71,10 @@ IBOV_COMPOSITION = {
 
 def inject_css():
     st.markdown("""
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-    /* ── Fonte global ── */
+    /* ── Fonte Inter via @import ── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
     html, body, [class*="css"], .stMarkdown, .stMetric,
     .stSelectbox, .stMultiSelect, .stTextInput, .stButton,
     button, input, label, p, span, div {
@@ -82,10 +83,13 @@ def inject_css():
 
     .block-container { padding-top: 0.6rem; padding-bottom: 1rem; }
 
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0d1117 0%, #0f1923 100%);
-        border-right: 1px solid #1e2d3d;
+    /* ── Ocultar sidebar completamente ── */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebarNav"],
+    [data-testid="stSidebarCollapsedControl"],
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        width: 0 !important;
     }
 
     /* Metric cards */
@@ -345,18 +349,29 @@ def save_watchlist(items):
 # SIDEBAR
 # ─────────────────────────────────────────────
 
-def build_sidebar():
-    st.image("images/avatar-renova-instagram.png")
+def render_ticker_controls():
+    """Barra horizontal de seleção de ativos — renderizada no conteúdo principal."""
     ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
 
-    tickers = st.multiselect("Selecione as Empresas", options=ticker_list, placeholder="Códigos")
-    tickers = [t + ".SA" for t in tickers]
-    start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
-    end_date = st.date_input("Até", value=datetime.now().date(), format="YYYY-MM-DD")
+    with st.container(border=True):
+        c1, c2, c3 = st.columns([5, 2, 2])
+        with c1:
+            raw = st.multiselect(
+                "Empresas",
+                options=ticker_list,
+                placeholder="Selecione os códigos (ex: VALE3, PETR4...)",
+                label_visibility="collapsed",
+            )
+        with c2:
+            start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
+        with c3:
+            end_date = st.date_input("Até", value=datetime.now().date(), format="YYYY-MM-DD")
 
-    if not tickers:
-        st.warning("Selecione pelo menos um ticker.")
+    if not raw:
+        st.info("Selecione pelo menos um ativo acima para continuar.")
         return None, None
+
+    tickers = [t + ".SA" for t in raw]
 
     with st.spinner("Carregando dados..."):
         prices = download_prices(tuple(tickers), start_date, end_date)
@@ -1495,11 +1510,22 @@ st.set_page_config(
     page_title="Renova Invest",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 inject_css()
 
-# ── Navbar horizontal superior ────────────────────────────────────────
+# ── Header ────────────────────────────────────────────────────────────
+col_logo, col_title = st.columns([1, 11])
+with col_logo:
+    st.image("images/avatar-renova-instagram.png", width=72)
+with col_title:
+    st.markdown(
+        '<div class="main-title">Renova Invest</div>'
+        '<div class="main-subtitle">Mercado de Capitais  ·  B3</div>',
+        unsafe_allow_html=True,
+    )
+
+# ── Navbar horizontal ─────────────────────────────────────────────────
 TAB_NAMES = [
     "Dashboard", "Analise Tecnica", "Screener", "Multiplos", "Resultados",
     "Correlacao", "Dividendos", "Fluxo", "Agenda", "Watchlist",
@@ -1523,10 +1549,7 @@ selected_tab = option_menu(
             "border-bottom": "1px solid #1e2d3d",
             "margin-bottom": "16px",
         },
-        "icon": {
-            "color": "#64748b",
-            "font-size": "13px",
-        },
+        "icon": {"color": "#64748b", "font-size": "13px"},
         "nav-link": {
             "font-family": "Inter, sans-serif",
             "font-size": "13px",
@@ -1546,26 +1569,16 @@ selected_tab = option_menu(
     },
 )
 
-# ── Sidebar: só aparece quando a aba precisa de tickers ───────────────
+# ── Controles de ativos (inline, sem sidebar) ─────────────────────────
 TABS_WITH_TICKERS = {"Dashboard", "Correlacao", "Multiplos", "Resultados", "Dividendos", "Agenda", "RRG"}
 
-with st.sidebar:
-    if selected_tab in TABS_WITH_TICKERS:
-        tickers, prices = build_sidebar()
-    else:
-        st.image("images/avatar-renova-instagram.png")
-        tickers, prices = None, None
-
-# ── Header ────────────────────────────────────────────────────────────
-st.markdown(
-    '<div class="main-title">Renova Invest</div>'
-    '<div class="main-subtitle">Mercado de Capitais  ·  B3</div>',
-    unsafe_allow_html=True,
-)
+tickers, prices = None, None
+if selected_tab in TABS_WITH_TICKERS:
+    tickers, prices = render_ticker_controls()
 
 # ── Roteamento ────────────────────────────────────────────────────────
 if selected_tab in TABS_WITH_TICKERS and (not tickers or prices is None):
-    st.warning("Selecione pelo menos um ticker na barra lateral.")
+    pass  # render_ticker_controls já exibiu o aviso
 elif selected_tab == "Dashboard":
     main_dashboard(tickers, prices)
 elif selected_tab == "Analise Tecnica":
