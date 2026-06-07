@@ -8,7 +8,6 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_extras.grid import grid
-from streamlit_option_menu import option_menu
 import seaborn as sns
 import matplotlib.pyplot as plt
 import yahooquery as yq
@@ -180,6 +179,50 @@ def inject_css():
     .copom-past { opacity: .45; }
 
     hr { border-color: rgba(255,255,255,.06) !important; }
+
+    /* ── st.tabs() estilizado como navbar ── */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #0d1117 !important;
+        border-bottom: 1px solid #1e2d3d !important;
+        gap: 0 !important;
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        padding: 0 !important;
+    }
+    /* esconde a scrollbar do tab-list mas mantém funcionalidade */
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { height: 0; }
+
+    .stTabs [data-baseweb="tab"] {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        color: #94a3b8 !important;
+        padding: 12px 18px !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        white-space: nowrap !important;
+        border-bottom: 2px solid transparent !important;
+        transition: color .15s, background .15s !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #e2e8f0 !important;
+        background: #161f2e !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #00d28c !important;
+        background: #161f2e !important;
+        border-bottom: 2px solid #00d28c !important;
+        font-weight: 600 !important;
+    }
+    /* remove o highlight padrão azul do Streamlit */
+    .stTabs [data-baseweb="tab-highlight"],
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+    /* conteúdo da tab sem padding extra no topo */
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 1rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -1514,82 +1557,72 @@ st.set_page_config(
 )
 inject_css()
 
-# ── Navbar horizontal ─────────────────────────────────────────────────
-TAB_NAMES = [
-    "Dashboard", "Analise Tecnica", "Screener", "Multiplos", "Resultados",
-    "Correlacao", "Dividendos", "Fluxo", "Agenda", "Watchlist",
-    "RRG", "Mapa IBOV", "Noticias",
-]
-
-selected_tab = option_menu(
-    menu_title=None,
-    options=TAB_NAMES,
-    orientation="horizontal",
-    default_index=0,
-    styles={
-        "container": {
-            "padding": "0",
-            "background-color": "#0d1117",
-            "border-bottom": "1px solid #1e2d3d",
-            "margin-bottom": "16px",
-        },
-        "nav-link": {
-            "font-family": "Inter, sans-serif",
-            "font-size": "12.5px",
-            "font-weight": "500",
-            "color": "#94a3b8",
-            "padding": "10px 14px",
-            "border-radius": "0",
-            "--hover-color": "#161f2e",
-        },
-        "nav-link-selected": {
-            "background-color": "#161f2e",
-            "color": "#00d28c",
-            "font-weight": "600",
-            "border-bottom": "2px solid #00d28c",
-        },
-    },
-)
-
-# ── Controles de ativos (inline, sem sidebar) ─────────────────────────
-TABS_WITH_TICKERS = {"Dashboard", "Correlacao", "Multiplos", "Resultados", "Dividendos", "Agenda", "RRG"}
-
+# ── Header ────────────────────────────────────────────────────────────
 st.markdown(
     '<div class="main-title">Renova Invest</div>'
     '<div class="main-subtitle">Mercado de Capitais  ·  B3</div>',
     unsafe_allow_html=True,
 )
 
-tickers, prices = None, None
-if selected_tab in TABS_WITH_TICKERS:
-    tickers, prices = render_ticker_controls()
+# ── Navegação via st.tabs() — rola automaticamente quando não cabe ─────
+(
+    tab_dashboard, tab_tecnica, tab_screener, tab_multiplos, tab_resultados,
+    tab_correlacao, tab_dividendos, tab_fluxo, tab_agenda, tab_watchlist,
+    tab_rrg, tab_mapa, tab_noticias,
+) = st.tabs([
+    "Dashboard", "Analise Tecnica", "Screener", "Multiplos", "Resultados",
+    "Correlacao", "Dividendos", "Fluxo Estrangeiro", "Agenda", "Watchlist",
+    "RRG", "Mapa IBOV", "Noticias",
+])
 
-# ── Roteamento ────────────────────────────────────────────────────────
-if selected_tab in TABS_WITH_TICKERS and (not tickers or prices is None):
-    pass  # render_ticker_controls já exibiu o aviso
-elif selected_tab == "Dashboard":
-    main_dashboard(tickers, prices)
-elif selected_tab == "Analise Tecnica":
+with tab_dashboard:
+    t, p = render_ticker_controls()
+    if t and p is not None:
+        main_dashboard(t, p)
+
+with tab_tecnica:
     technical_analysis_dashboard()
-elif selected_tab == "Screener":
+
+with tab_screener:
     screener_dashboard()
-elif selected_tab == "Multiplos":
-    multiples_dashboard(tickers)
-elif selected_tab == "Resultados":
-    results_dashboard(tickers)
-elif selected_tab == "Correlacao":
-    correlation_dashboard(prices)
-elif selected_tab == "Dividendos":
-    dividends_dashboard(tickers)
-elif selected_tab == "Fluxo":
+
+with tab_multiplos:
+    t, p = render_ticker_controls()
+    if t and p is not None:
+        multiples_dashboard(t)
+
+with tab_resultados:
+    t, p = render_ticker_controls()
+    if t and p is not None:
+        results_dashboard(t)
+
+with tab_correlacao:
+    t, p = render_ticker_controls()
+    if t and p is not None:
+        correlation_dashboard(p)
+
+with tab_dividendos:
+    t, p = render_ticker_controls()
+    if t and p is not None:
+        dividends_dashboard(t)
+
+with tab_fluxo:
     foreign_flow_dashboard()
-elif selected_tab == "Agenda":
-    agenda_dashboard(tickers)
-elif selected_tab == "Watchlist":
+
+with tab_agenda:
+    t, p = render_ticker_controls()
+    agenda_dashboard(t)
+
+with tab_watchlist:
     watchlist_dashboard()
-elif selected_tab == "RRG":
-    rrg_graph(tickers, prices)
-elif selected_tab == "Mapa IBOV":
+
+with tab_rrg:
+    t, p = render_ticker_controls()
+    if t and p is not None:
+        rrg_graph(t, p)
+
+with tab_mapa:
     ibovespa_map()
-elif selected_tab == "Noticias":
+
+with tab_noticias:
     news_terminal()
