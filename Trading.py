@@ -324,6 +324,16 @@ def download_b3_dados_mercado_text() -> str:
 
 
 # ─────────────────────────────────────────────
+# HELPER: leitura do CSV de tickers
+# ─────────────────────────────────────────────
+
+def load_ticker_list() -> list:
+    """Lê tickers_ibra.csv e retorna lista de strings (ex: ['VALE3', 'PETR4', ...])."""
+    df = pd.read_csv("tickers/tickers_ibra.csv", index_col=0, header=None)
+    return df.iloc[:, 0].tolist()
+
+
+# ─────────────────────────────────────────────
 # INDICADORES TÉCNICOS
 # ─────────────────────────────────────────────
 
@@ -394,7 +404,7 @@ def save_watchlist(items):
 
 def render_ticker_controls():
     """Barra horizontal de seleção de ativos — renderizada no conteúdo principal."""
-    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
+    ticker_list = load_ticker_list()
 
     with st.container(border=True):
         c1, c2, c3 = st.columns([5, 2, 2])
@@ -490,7 +500,7 @@ def main_dashboard(tickers, prices):
 def technical_analysis_dashboard():
     st.markdown('<div class="sec-label">📈 Análise Técnica</div>', unsafe_allow_html=True)
 
-    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
+    ticker_list = load_ticker_list()
     c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
     ticker       = c1.selectbox("Ativo", options=ticker_list)
     interval_lbl = c2.selectbox("Timeframe", ["Diário", "Semanal", "Mensal"])
@@ -637,8 +647,8 @@ def screener_dashboard():
     st.markdown('<div class="sec-label">🔍 Screener de Ações</div>', unsafe_allow_html=True)
     st.caption("Filtros automáticos sobre os ativos do IBRA com base em indicadores técnicos e preço.")
 
-    ticker_list = pd.read_csv("tickers/tickers_ibra.csv", index_col=0)
-    all_tickers = [t + ".SA" for t in ticker_list.index.tolist()]
+    ticker_list = load_ticker_list()
+    all_tickers = [t + ".SA" for t in ticker_list]
 
     col1, col2 = st.columns([3, 1])
     with col1:
