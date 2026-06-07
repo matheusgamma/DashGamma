@@ -1520,32 +1520,29 @@ TAB_NAMES = [
     "Correlacao", "Dividendos", "Fluxo", "Agenda", "Watchlist",
     "RRG", "Mapa IBOV", "Noticias",
 ]
-TAB_ICONS = [
-    "bar-chart-fill", "graph-up-arrow", "search", "clipboard-data", "file-bar-graph-fill",
-    "grid-3x3-gap-fill", "cash-coin", "globe-americas", "calendar3", "star-fill",
-    "arrow-repeat", "map-fill", "newspaper",
-]
 
 selected_tab = option_menu(
     menu_title=None,
     options=TAB_NAMES,
-    icons=TAB_ICONS,
+    icons=[""] * len(TAB_NAMES),   # sem ícones — libera espaço horizontal
     orientation="horizontal",
     styles={
         "container": {
-            "padding": "4px 0 0 0",
+            "padding": "0",
             "background-color": "#0d1117",
             "border-bottom": "1px solid #1e2d3d",
             "margin-bottom": "16px",
+            "white-space": "nowrap",
         },
-        "icon": {"color": "#64748b", "font-size": "13px"},
+        "icon": {"display": "none"},          # esconde a coluna de ícones
         "nav-link": {
             "font-family": "Inter, sans-serif",
-            "font-size": "13px",
+            "font-size": "12.5px",
             "font-weight": "500",
             "color": "#94a3b8",
-            "padding": "8px 12px",
-            "border-radius": "6px 6px 0 0",
+            "padding": "10px 13px",
+            "border-radius": "0",
+            "white-space": "nowrap",
             "--hover-color": "#161f2e",
         },
         "nav-link-selected": {
@@ -1554,7 +1551,6 @@ selected_tab = option_menu(
             "font-weight": "600",
             "border-bottom": "2px solid #00d28c",
         },
-        "icon-selected": {"color": "#00d28c"},
     },
 )
 
