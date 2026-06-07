@@ -1524,25 +1524,22 @@ TAB_NAMES = [
 selected_tab = option_menu(
     menu_title=None,
     options=TAB_NAMES,
-    icons=[""] * len(TAB_NAMES),   # sem ícones — libera espaço horizontal
     orientation="horizontal",
+    default_index=0,
     styles={
         "container": {
             "padding": "0",
             "background-color": "#0d1117",
             "border-bottom": "1px solid #1e2d3d",
             "margin-bottom": "16px",
-            "white-space": "nowrap",
         },
-        "icon": {"display": "none"},          # esconde a coluna de ícones
         "nav-link": {
             "font-family": "Inter, sans-serif",
             "font-size": "12.5px",
             "font-weight": "500",
             "color": "#94a3b8",
-            "padding": "10px 13px",
+            "padding": "10px 14px",
             "border-radius": "0",
-            "white-space": "nowrap",
             "--hover-color": "#161f2e",
         },
         "nav-link-selected": {
