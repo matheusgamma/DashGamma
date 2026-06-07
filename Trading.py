@@ -402,7 +402,7 @@ def save_watchlist(items):
 # SIDEBAR
 # ─────────────────────────────────────────────
 
-def render_ticker_controls():
+def render_ticker_controls(key: str = "default"):
     """Barra horizontal de seleção de ativos — renderizada no conteúdo principal."""
     ticker_list = load_ticker_list()
 
@@ -414,11 +414,18 @@ def render_ticker_controls():
                 options=ticker_list,
                 placeholder="Selecione os códigos (ex: VALE3, PETR4...)",
                 label_visibility="collapsed",
+                key=f"tickers_{key}",
             )
         with c2:
-            start_date = st.date_input("De", value=datetime(2023, 1, 2), format="YYYY-MM-DD")
+            start_date = st.date_input(
+                "De", value=datetime(2023, 1, 2), format="YYYY-MM-DD",
+                key=f"start_{key}",
+            )
         with c3:
-            end_date = st.date_input("Até", value=datetime.now().date(), format="YYYY-MM-DD")
+            end_date = st.date_input(
+                "Até", value=datetime.now().date(), format="YYYY-MM-DD",
+                key=f"end_{key}",
+            )
 
     if not raw:
         st.info("Selecione pelo menos um ativo acima para continuar.")
@@ -1586,7 +1593,7 @@ st.markdown(
 ])
 
 with tab_dashboard:
-    t, p = render_ticker_controls()
+    t, p = render_ticker_controls("dashboard")
     if t and p is not None:
         main_dashboard(t, p)
 
@@ -1597,22 +1604,22 @@ with tab_screener:
     screener_dashboard()
 
 with tab_multiplos:
-    t, p = render_ticker_controls()
+    t, p = render_ticker_controls("multiplos")
     if t and p is not None:
         multiples_dashboard(t)
 
 with tab_resultados:
-    t, p = render_ticker_controls()
+    t, p = render_ticker_controls("resultados")
     if t and p is not None:
         results_dashboard(t)
 
 with tab_correlacao:
-    t, p = render_ticker_controls()
+    t, p = render_ticker_controls("correlacao")
     if t and p is not None:
         correlation_dashboard(p)
 
 with tab_dividendos:
-    t, p = render_ticker_controls()
+    t, p = render_ticker_controls("dividendos")
     if t and p is not None:
         dividends_dashboard(t)
 
@@ -1620,14 +1627,14 @@ with tab_fluxo:
     foreign_flow_dashboard()
 
 with tab_agenda:
-    t, p = render_ticker_controls()
+    t, p = render_ticker_controls("agenda")
     agenda_dashboard(t)
 
 with tab_watchlist:
     watchlist_dashboard()
 
 with tab_rrg:
-    t, p = render_ticker_controls()
+    t, p = render_ticker_controls("rrg")
     if t and p is not None:
         rrg_graph(t, p)
 
